@@ -19,9 +19,7 @@ const (
 )
 
 type versionTag struct {
-	major      int
-	minor      int
-	patch      int
+	parts      []int
 	prerelease string
 }
 
@@ -121,14 +119,22 @@ func isVersionTagNewer(currentTag, latestTag string) bool {
 		return false
 	}
 
-	if latest.major != current.major {
-		return latest.major > current.major
+	maxLen := len(current.parts)
+	if len(latest.parts) > maxLen {
+		maxLen = len(latest.parts)
 	}
-	if latest.minor != current.minor {
-		return latest.minor > current.minor
-	}
-	if latest.patch != current.patch {
-		return latest.patch > current.patch
+	for i := 0; i < maxLen; i++ {
+		var currentPart int
+		if i < len(current.parts) {
+			currentPart = current.parts[i]
+		}
+		var latestPart int
+		if i < len(latest.parts) {
+			latestPart = latest.parts[i]
+		}
+		if latestPart != currentPart {
+			return latestPart > currentPart
+		}
 	}
 
 	if latest.prerelease == "" && current.prerelease != "" {
@@ -163,31 +169,31 @@ func parseVersionTag(raw string) (versionTag, bool) {
 	}
 
 	core := strings.Split(tag, ".")
-	if len(core) != 3 {
+	if len(core) < 3 {
 		return versionTag{}, false
 	}
 
-	major, err := strconv.Atoi(strings.TrimSpace(core[0]))
-	if err != nil || major < 0 {
-		return versionTag{}, false
+	parts := make([]int, 0, len(core))
+	for _, part := range core {
+		value, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || value < 0 {
+			return versionTag{}, false
+		}
+		parts = append(parts, value)
 	}
-	minor, err := strconv.Atoi(strings.TrimSpace(core[1]))
-	if err != nil || minor < 0 {
-		return versionTag{}, false
-	}
-	patch, err := strconv.Atoi(strings.TrimSpace(core[2]))
-	if err != nil || patch < 0 {
-		return versionTag{}, false
-	}
-
-	parsed.major = major
-	parsed.minor = minor
-	parsed.patch = patch
+	parsed.parts = parts
 	return parsed, true
 }
 
 func (v versionTag) normalizedString() string {
-	base := strconv.Itoa(v.major) + "." + strconv.Itoa(v.minor) + "." + strconv.Itoa(v.patch)
+	if len(v.parts) == 0 {
+		return ""
+	}
+	partStrings := make([]string, 0, len(v.parts))
+	for _, part := range v.parts {
+		partStrings = append(partStrings, strconv.Itoa(part))
+	}
+	base := strings.Join(partStrings, ".")
 	if v.prerelease == "" {
 		return base
 	}
