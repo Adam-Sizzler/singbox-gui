@@ -1,0 +1,213 @@
+//go:build windows
+
+package app
+
+import (
+	"archive/zip"
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+func resolveVersion(version string) (string, error) {
+	v := strings.TrimSpace(strings.TrimPrefix(version, "v"))
+	if strings.EqualFold(v, "latest") || v == "" {
+		latest, err := fetchLatestVersion()
+		if err != nil {
+			return "", err
+		}
+		return latest, nil
+	}
+	if !semverRegex.MatchString(v) {
+		return "", fmt.Errorf("версия %q имеет неверный формат", version)
+	}
+	return v, nil
+}
+
+func fetchLatestVersion() (string, error) {
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/SagerNet/sing-box/releases/latest", nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", userAgent)
+
+	client := &http.Client{Timeout: 20 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("github недоступен: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("github вернул HTTP %d", resp.StatusCode)
+	}
+
+	var body struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return "", fmt.Errorf("не удалось распарсить ответ GitHub: %w", err)
+	}
+	version := strings.TrimSpace(strings.TrimPrefix(body.TagName, "v"))
+	if !semverRegex.MatchString(version) {
+		return "", fmt.Errorf("получен некорректный tag_name: %q", body.TagName)
+	}
+	return version, nil
+}
+
+func detectSingBoxVersion(singboxPath string) (string, error) {
+	if _, err := os.Stat(singboxPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	out, err := commandWithTimeout(singboxPath, 6*time.Second, "version")
+	if err != nil {
+		return "", err
+	}
+	match := semverRegex.FindString(string(out))
+	if match == "" {
+		return "", fmt.Errorf("не удалось извлечь версию из вывода: %q", string(out))
+	}
+	return strings.TrimSpace(match), nil
+}
+
+func downloadAndInstallSingBox(version, targetExe string) error {
+	downloadURL := fmt.Sprintf(
+		"https://github.com/SagerNet/sing-box/releases/download/v%s/sing-box-%s-windows-amd64.zip",
+		version,
+		version,
+	)
+
+	zipPath := targetExe + ".zip"
+	if err := downloadFile(downloadURL, zipPath, map[string]string{"User-Agent": userAgent}); err != nil {
+		return fmt.Errorf("не удалось скачать sing-box %s: %w", version, err)
+	}
+	defer os.Remove(zipPath)
+
+	if err := extractSingBoxExe(zipPath, targetExe); err != nil {
+		return fmt.Errorf("ошибка распаковки sing-box: %w", err)
+	}
+	return nil
+}
+
+func downloadRuntimeConfig(url, target string) error {
+	if err := downloadFile(url, target, map[string]string{"User-Agent": userAgent}); err != nil {
+		return fmt.Errorf("не удалось скачать config.json: %w", err)
+	}
+	return validateRuntimeConfigFile(target)
+}
+
+func ensureLocalRuntimeConfig(target string) error {
+	if _, err := os.Stat(target); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return errors.New("URL не указан, а локальный config.json не найден")
+		}
+		return err
+	}
+	if err := validateRuntimeConfigFile(target); err != nil {
+		return fmt.Errorf("локальный config.json не является валидным JSON: %w", err)
+	}
+	return nil
+}
+
+func validateRuntimeConfigFile(path string) error {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if !json.Valid(bytes.TrimSpace(b)) {
+		return errors.New("config.json не является валидным JSON")
+	}
+	return nil
+}
+
+func downloadFile(url, target string, headers map[string]string) error {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	tmpPath := target + ".tmp"
+	file, err := os.Create(tmpPath)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(file, resp.Body); err != nil {
+		file.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+
+	if err := os.Rename(tmpPath, target); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	return nil
+}
+
+func extractSingBoxExe(zipPath, targetExe string) error {
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+		if strings.EqualFold(filepath.Base(f.Name), singboxExeName) {
+			rc, err := f.Open()
+			if err != nil {
+				return err
+			}
+			defer rc.Close()
+
+			tmp := targetExe + ".tmp"
+			out, err := os.Create(tmp)
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(out, rc); err != nil {
+				out.Close()
+				_ = os.Remove(tmp)
+				return err
+			}
+			if err := out.Close(); err != nil {
+				_ = os.Remove(tmp)
+				return err
+			}
+			if err := os.Rename(tmp, targetExe); err != nil {
+				_ = os.Remove(tmp)
+				return err
+			}
+			return nil
+		}
+	}
+	return errors.New("sing-box.exe не найден в архиве")
+}

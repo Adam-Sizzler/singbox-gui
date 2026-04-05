@@ -1,45 +1,106 @@
-# sing-box GUI Client (Windows, Go)
+# Sing-box GUI Client (Windows)
 
-Нативный Windows GUI-клиент для запуска `sing-box` с portable-логикой:
+Native Windows GUI client for `sing-box` with portable runtime behavior.
 
-- `config.yaml` рядом с `.exe`
-- скачивание `sing-box.exe` нужной версии (или `latest`)
-- скачивание `config.json` по URL с заголовком `User-Agent: sfw`
-- запуск `sing-box.exe run -c config.json --disable-color`
-- автоостановка старого процесса при повторном `Start`
-- завершение процесса при закрытии окна
-- переключаемая кнопка `Start/Stop`
-- авто-тема по системной настройке Windows (light/dark), без ручного переключателя
-- монохромный вывод логов в UI (без ANSI-цвета, чтобы избежать мерцания)
+Russian version: `README.ru.md`
 
-## Сборка
+## Features
+
+- Single executable target: `singbox-gui.exe`
+- Embedded UI assets (frontend is built into the binary)
+- Config stored near executable (`config.yaml`)
+- Downloads `sing-box.exe` by selected version (`latest` or semver)
+- Downloads runtime `config.json` from subscription URL (`User-Agent: sfw`)
+- Process control from UI (`Start` / `Stop`)
+- ANSI-aware colored log rendering in UI
+- Multiple profiles (`create`, `select`, `delete`)
+- RU/EN localization with language switch in UI
+- `sing-box://import-remote-profile?...` protocol support
+- Single-instance import behavior:
+  - if app is already running, import is sent to existing window
+  - existing window is focused
+  - no second window is created
+- Import does **not** auto-start sing-box
+- Requests admin rights on startup (`runas`)
+
+## Requirements
+
+- Windows 10/11 x64
+- Go toolchain (for local build)
+- Network access for downloading `sing-box.exe` / remote config
+
+## Build
 
 ```bash
 go mod tidy
 ./build-windows.sh
 ```
 
-Если собираете вручную, обязательно вшивайте manifest (Common Controls v6), иначе на части систем возможна ошибка `TTM_ADDTOOL failed`.
-Для сборки без консольного окна используйте `-ldflags "-H=windowsgui"`.
-
-## Структура после запуска
+Output:
 
 ```text
-/singbox-gui.exe
-/config.yaml
-/sing-box.exe
-/config.json
+./singbox-gui.exe
 ```
 
-## Конфиг
+`build-windows.sh` also regenerates `cmd/singbox-gui/rsrc.syso` from:
 
-`config.yaml` создается автоматически при первом запуске:
+- `build/windows/app.exe.manifest`
+- `build/windows/app-icon.ico` (can be generated from your SVG icon)
+
+## Run Layout
+
+After first start, files are created next to executable:
+
+```text
+singbox-gui.exe
+config.yaml
+sing-box.exe
+config.json
+```
+
+## Config Format
+
+Current config format:
 
 ```yaml
-url: ""
-version: latest
+language: ru
+current_profile: default
+profiles:
+  - name: default
+    url: ""
+    version: latest
 ```
 
-## Требование прав администратора
+## Protocol Import
 
-При запуске приложение проверяет права и, если нужно, перезапускает себя через `runas`.
+Supported URI format:
+
+```text
+sing-box://import-remote-profile?url=https%3A%2F%2Fexample.com%2Fsub#profile-name
+```
+
+Behavior:
+
+- `url` is required and must be `http://` or `https://`
+- if `#profile-name` exists:
+  - update that profile URL if it exists, or create profile
+  - switch current profile to it
+- if profile name is absent: apply URL to current profile
+- no auto-start after import
+
+## GitHub Actions
+
+Workflow: `.github/workflows/build-windows-on-tag.yml`
+
+- Trigger: push of any tag
+- Result: uploaded artifact `singbox-gui-windows-<tag>`
+
+## Repository Hygiene
+
+Recommended ignored local artifacts:
+
+- built exe
+- runtime files (`config.yaml`, `config.json`, `sing-box.exe`)
+- temporary logs
+
+`.gitignore` is included for this.

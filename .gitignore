@@ -1,0 +1,13 @@
+# Local build outputs
+singbox-gui.exe
+*.exe
+
+# Runtime artifacts created next to executable
+config.yaml
+config.json
+sing-box.exe
+
+# Local logs and temp files
+*.log
+*.tmp
+*.bak

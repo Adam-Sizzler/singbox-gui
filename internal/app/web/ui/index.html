@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sing-box GUI</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app">
+    <section class="panel">
+      <h1 id="settingsTitle">Настройки</h1>
+      <div class="field-row">
+        <label class="field-label" id="labelUrl" for="url">Config URL:</label>
+        <div class="field-control">
+          <input class="control" id="url" type="text" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <label class="field-label" id="labelVersion" for="version">Версия sing-box:</label>
+        <div class="field-control">
+          <input class="control" id="version" type="text" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <label class="field-label" id="labelProfile" for="profilePicker">Профиль:</label>
+        <div class="field-control">
+          <div class="profile-controls">
+            <div class="profile-picker-wrap" id="profileWrap">
+              <button class="control profile-picker" id="profilePicker" type="button" aria-haspopup="listbox" aria-expanded="false">
+                <span id="profileValue" class="profile-value"></span>
+                <span class="profile-arrow" aria-hidden="true"></span>
+              </button>
+              <div id="profileMenu" class="profile-menu" role="listbox" hidden></div>
+            </div>
+            <div class="profile-actions">
+              <button class="control" id="newProfile" type="button">Новый</button>
+              <button class="control" id="deleteProfile" type="button">Удалить</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <label class="field-label" id="labelLanguage" for="langRu">Язык:</label>
+        <div class="field-control">
+          <div class="lang-switch">
+            <button class="control lang-btn" id="langRu" type="button">RU</button>
+            <button class="control lang-btn" id="langEn" type="button">EN</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel actions">
+      <button class="control" id="startStop" type="button">Старт</button>
+      <button class="control" id="copyLogs" type="button">Копировать логи</button>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section class="panel logs-panel">
+      <h2 id="logsTitle">Логи</h2>
+      <div id="logs" class="control"></div>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
