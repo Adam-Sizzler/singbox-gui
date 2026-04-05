@@ -198,6 +198,15 @@ func (a *App) startProcess() error {
 	cmd := exec.Command(a.singBoxPath, "run", "-c", a.runtimeCfg)
 	cmd.Dir = a.workDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: createNoWindow | createNewProcessGroup}
+	cfg := a.getConfigSnapshot()
+	envOverrides := normalizeSingboxEnv(cfg.SingboxEnv)
+	if len(envOverrides) > 0 {
+		env := os.Environ()
+		for key, value := range envOverrides {
+			env = append(env, key+"="+value)
+		}
+		cmd.Env = env
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

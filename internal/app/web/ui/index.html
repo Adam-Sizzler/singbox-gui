@@ -68,6 +68,13 @@
           <div class="run-controls">
             <button class="control" id="checkConfig" type="button">Проверить</button>
             <button class="control" id="startStop" type="button">Старт</button>
+            <div id="mobileActionsWrap" class="mobile-actions-wrap">
+              <button class="control mobile-actions-toggle" id="mobileActionsToggle" type="button" aria-haspopup="menu" aria-expanded="false">Действия</button>
+              <div id="mobileActionsMenu" class="mobile-actions-menu" role="menu" hidden>
+                <button id="mobileActionCheckConfig" class="mobile-actions-item" type="button" role="menuitem">Проверить</button>
+                <button id="mobileActionCopyLogs" class="mobile-actions-item" type="button" role="menuitem">Копировать логи</button>
+              </div>
+            </div>
             <div id="status" class="status"></div>
             <div id="uptime" class="uptime"></div>
           </div>
@@ -97,6 +104,8 @@
       </div>
     </div>
   </div>
+
+  <div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
 
   <script src="/app.js"></script>
 </body>

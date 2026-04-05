@@ -11,6 +11,12 @@
   var checkConfigBtn = document.getElementById("checkConfig");
   var startStopBtn = document.getElementById("startStop");
   var copyLogsBtn = document.getElementById("copyLogs");
+  var mobileActionsWrap = document.getElementById("mobileActionsWrap");
+  var mobileActionsToggleBtn = document.getElementById("mobileActionsToggle");
+  var mobileActionsMenu = document.getElementById("mobileActionsMenu");
+  var mobileActionCheckConfigBtn = document.getElementById("mobileActionCheckConfig");
+  var mobileActionCopyLogsBtn = document.getElementById("mobileActionCopyLogs");
+  var toastStack = document.getElementById("toastStack");
   var statusNode = document.getElementById("status");
   var uptimeNode = document.getElementById("uptime");
   var logsNode = document.getElementById("logs");
@@ -34,11 +40,16 @@
   var stateTimer = null;
   var logsTimer = null;
   var saveTimer = null;
+  var stateReqInFlight = false;
+  var stateReqQueued = false;
+  var logsReqInFlight = false;
+  var copyLogsInFlight = false;
   var loadingState = false;
   var ansiCodeRegex = /\x1b\[([0-9;]*)m/g;
   var profileNames = [];
   var selectedProfile = "";
   var profileMenuOpened = false;
+  var mobileActionsOpened = false;
   var currentLanguage = "ru";
   var lastRunning = false;
   var lastBusy = false;
@@ -46,6 +57,8 @@
   var lastAutoUpdateHours = 12;
   var lastUptimeSeconds = 0;
   var confirmAction = null;
+  var STATE_POLL_MS = 1500;
+  var LOGS_POLL_MS = 400;
 
   var I18N = {
     ru: {
@@ -62,6 +75,7 @@
       start: "Старт",
       stop: "Стоп",
       copyLogs: "Копировать логи",
+      actionsMenu: "Действия",
       statusBusy: "Выполняется операция...",
       statusRunning: "sing-box запущен",
       statusStopped: "sing-box остановлен",
@@ -89,6 +103,7 @@
       start: "Start",
       stop: "Stop",
       copyLogs: "Copy Logs",
+      actionsMenu: "Actions",
       statusBusy: "Operation in progress...",
       statusRunning: "sing-box is running",
       statusStopped: "sing-box is stopped",
@@ -180,6 +195,9 @@
     if (newProfileBtn) newProfileBtn.textContent = tr("newProfile");
     if (deleteProfileBtn) deleteProfileBtn.textContent = tr("deleteProfile");
     if (copyLogsBtn) copyLogsBtn.textContent = tr("copyLogs");
+    if (mobileActionsToggleBtn) mobileActionsToggleBtn.textContent = tr("actionsMenu");
+    if (mobileActionCheckConfigBtn) mobileActionCheckConfigBtn.textContent = tr("checkConfig");
+    if (mobileActionCopyLogsBtn) mobileActionCopyLogsBtn.textContent = tr("copyLogs");
     if (startStopBtn) startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
     if (confirmTitleNode) confirmTitleNode.textContent = tr("confirmTitle");
     if (confirmCancelBtn) confirmCancelBtn.textContent = tr("cancel");
@@ -191,6 +209,10 @@
     }
     if (langEnBtn) {
       langEnBtn.className = currentLanguage === "en" ? "control lang-btn active" : "control lang-btn";
+    }
+
+    if (mobileActionsToggleBtn) {
+      mobileActionsToggleBtn.setAttribute("aria-label", tr("actionsMenu"));
     }
   }
 
@@ -363,6 +385,135 @@
     }
   }
 
+  function showToast(kind, message, ttlMs) {
+    if (!toastStack || !message) return;
+
+    var tone = kind || "info";
+    var toast = document.createElement("div");
+    toast.className = "toast toast-" + tone;
+    toast.textContent = message;
+    toastStack.appendChild(toast);
+
+    setTimeout(function () {
+      if (!toast || !toast.parentNode) return;
+      toast.className += " visible";
+    }, 10);
+
+    var ttl = parseInt(ttlMs, 10);
+    if (isNaN(ttl) || ttl < 1200) {
+      ttl = tone === "error" ? 3600 : 2400;
+    }
+
+    setTimeout(function () {
+      if (!toast || !toast.parentNode) return;
+      toast.className = toast.className.replace(/\s?visible\b/g, "");
+      setTimeout(function () {
+        if (toast && toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 180);
+    }, ttl);
+  }
+
+  function setCheckButtonsDisabled(disabled) {
+    var next = !!disabled;
+    if (checkConfigBtn) checkConfigBtn.disabled = next;
+    if (mobileActionCheckConfigBtn) mobileActionCheckConfigBtn.disabled = next;
+  }
+
+  function setCopyButtonsDisabled(disabled) {
+    var next = !!disabled;
+    if (copyLogsBtn) copyLogsBtn.disabled = next;
+    if (mobileActionCopyLogsBtn) mobileActionCopyLogsBtn.disabled = next;
+  }
+
+  function isMobileActionsMenuOpen() {
+    return !!mobileActionsMenu && !mobileActionsMenu.hidden;
+  }
+
+  function closeMobileActionsMenu() {
+    if (!mobileActionsMenu || mobileActionsMenu.hidden) return;
+    mobileActionsMenu.hidden = true;
+    mobileActionsOpened = false;
+    if (mobileActionsToggleBtn) {
+      mobileActionsToggleBtn.setAttribute("aria-expanded", "false");
+    }
+  }
+
+  function openMobileActionsMenu() {
+    if (!mobileActionsMenu) return;
+    mobileActionsMenu.hidden = false;
+    mobileActionsOpened = true;
+    if (mobileActionsToggleBtn) {
+      mobileActionsToggleBtn.setAttribute("aria-expanded", "true");
+    }
+  }
+
+  function toggleMobileActionsMenu() {
+    if (isMobileActionsMenuOpen()) {
+      closeMobileActionsMenu();
+      return;
+    }
+    openMobileActionsMenu();
+  }
+
+  function startPolling() {
+    if (stateTimer || logsTimer) return;
+    stateTimer = setInterval(function () {
+      refreshState(false);
+    }, STATE_POLL_MS);
+    logsTimer = setInterval(function () {
+      pollLogs(false);
+    }, LOGS_POLL_MS);
+  }
+
+  function stopPolling() {
+    if (stateTimer) {
+      clearInterval(stateTimer);
+      stateTimer = null;
+    }
+    if (logsTimer) {
+      clearInterval(logsTimer);
+      logsTimer = null;
+    }
+  }
+
+  function runCheckConfigAction() {
+    if (lastBusy) return;
+    setCheckButtonsDisabled(true);
+    api("POST", "/api/action/check-config", {}, function (err, state) {
+      if (err) {
+        setStatus(tr("errorPrefix") + err.message);
+        showToast("error", tr("errorPrefix") + err.message);
+        refreshState(true);
+        return;
+      }
+      renderState(state);
+      setStatus(tr("statusConfigOk"));
+      showToast("success", tr("statusConfigOk"));
+      setTimeout(function () {
+        renderDefaultStatus(lastProtoWarn);
+      }, 1500);
+    });
+  }
+
+  function runCopyLogsAction() {
+    if (copyLogsInFlight) return;
+    copyLogsInFlight = true;
+    setCopyButtonsDisabled(true);
+    api("POST", "/api/action/copy-logs", {}, function (err) {
+      copyLogsInFlight = false;
+      setCopyButtonsDisabled(false);
+      if (err) {
+        setStatus(tr("errorPrefix") + err.message);
+        showToast("error", tr("errorPrefix") + err.message);
+        return;
+      }
+      setStatus(tr("statusLogsCopied"));
+      showToast("success", tr("statusLogsCopied"));
+    });
+  }
+
   function renderState(state) {
     loadingState = true;
 
@@ -410,7 +561,7 @@
     if (isNaN(lastUptimeSeconds) || lastUptimeSeconds < 0) lastUptimeSeconds = 0;
     startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
     startStopBtn.disabled = lastBusy;
-    if (checkConfigBtn) checkConfigBtn.disabled = lastBusy;
+    setCheckButtonsDisabled(lastBusy);
     applyLanguageUI();
     lastProtoWarn = state.proto_reg_warn || "";
     renderDefaultStatus(lastProtoWarn);
@@ -418,13 +569,28 @@
     loadingState = false;
   }
 
-  function refreshState() {
+  function refreshState(force) {
+    if (document.hidden && !force) return;
+    if (stateReqInFlight) {
+      if (force) {
+        stateReqQueued = true;
+      }
+      return;
+    }
+
+    stateReqInFlight = true;
     api("GET", "/api/state", null, function (err, state) {
+      stateReqInFlight = false;
       if (err) {
         setStatus(tr("errorPrefix") + err.message);
-        return;
+      } else {
+        renderState(state);
       }
-      renderState(state);
+
+      if (stateReqQueued) {
+        stateReqQueued = false;
+        refreshState(true);
+      }
     });
   }
 
@@ -584,8 +750,12 @@
     }
   }
 
-  function pollLogs() {
+  function pollLogs(force) {
+    if (document.hidden && !force) return;
+    if (logsReqInFlight) return;
+    logsReqInFlight = true;
     api("GET", "/api/logs?from=" + lastLogId, null, function (err, data) {
+      logsReqInFlight = false;
       if (err) {
         return;
       }
@@ -619,11 +789,22 @@
     }
   });
 
+  document.addEventListener("mousedown", function (e) {
+    if (!mobileActionsOpened || !mobileActionsWrap) return;
+    var target = e.target || e.srcElement;
+    if (mobileActionsWrap.contains && !mobileActionsWrap.contains(target)) {
+      closeMobileActionsMenu();
+    }
+  });
+
   document.addEventListener("keydown", function (e) {
     var key = e.key || "";
     if (key === "Escape") {
       if (profileMenuOpened) {
         closeProfileMenu();
+      }
+      if (mobileActionsOpened) {
+        closeMobileActionsMenu();
       }
       if (isConfirmModalOpen()) {
         if (e.preventDefault) e.preventDefault();
@@ -655,6 +836,26 @@
   if (confirmOkBtn) {
     confirmOkBtn.onclick = function () {
       runConfirmAction();
+    };
+  }
+
+  if (mobileActionsToggleBtn) {
+    mobileActionsToggleBtn.onclick = function () {
+      toggleMobileActionsMenu();
+    };
+  }
+
+  if (mobileActionCheckConfigBtn) {
+    mobileActionCheckConfigBtn.onclick = function () {
+      closeMobileActionsMenu();
+      runCheckConfigAction();
+    };
+  }
+
+  if (mobileActionCopyLogsBtn) {
+    mobileActionCopyLogsBtn.onclick = function () {
+      closeMobileActionsMenu();
+      runCopyLogsAction();
     };
   }
 
@@ -714,52 +915,47 @@
     api("POST", "/api/action/start-stop", {}, function (err, state) {
       if (err) {
         setStatus(tr("errorPrefix") + err.message);
+        showToast("error", tr("errorPrefix") + err.message);
         startStopBtn.disabled = false;
         return;
       }
       renderState(state);
-      refreshState();
+      refreshState(true);
     });
   };
 
   if (checkConfigBtn) {
     checkConfigBtn.onclick = function () {
-      checkConfigBtn.disabled = true;
-      api("POST", "/api/action/check-config", {}, function (err, state) {
-        if (err) {
-          setStatus(tr("errorPrefix") + err.message);
-          refreshState();
-          return;
-        }
-        renderState(state);
-        setStatus(tr("statusConfigOk"));
-        setTimeout(function () {
-          renderDefaultStatus(lastProtoWarn);
-        }, 1500);
-      });
+      runCheckConfigAction();
     };
   }
 
   copyLogsBtn.onclick = function () {
-    api("POST", "/api/action/copy-logs", {}, function (err) {
-      if (err) {
-        setStatus(tr("errorPrefix") + err.message);
-        return;
-      }
-      setStatus(tr("statusLogsCopied"));
-    });
+    runCopyLogsAction();
   };
 
-  refreshState();
-  pollLogs();
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      stopPolling();
+      closeMobileActionsMenu();
+      return;
+    }
+    refreshState(true);
+    pollLogs(true);
+    startPolling();
+  });
 
-  stateTimer = setInterval(refreshState, 1500);
-  logsTimer = setInterval(pollLogs, 400);
+  refreshState(true);
+  pollLogs(true);
+
+  if (!document.hidden) {
+    startPolling();
+  }
 
   window.onbeforeunload = function () {
-    if (stateTimer) clearInterval(stateTimer);
-    if (logsTimer) clearInterval(logsTimer);
+    stopPolling();
     if (saveTimer) clearTimeout(saveTimer);
+    closeMobileActionsMenu();
     closeConfirmModal();
   };
 })();

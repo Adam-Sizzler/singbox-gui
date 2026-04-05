@@ -18,23 +18,30 @@ const (
 	maxAutoUpdateHours   = 24 * 365
 )
 
+var defaultSingBoxEnv = map[string]string{
+	"ENABLE_DEPRECATED_LEGACY_DNS_SERVERS":      "true",
+	"ENABLE_DEPRECATED_MISSING_DOMAIN_RESOLVER": "true",
+}
+
 type AppConfig struct {
 	// Legacy flat fields (kept for backward compatibility).
 	URL         string `yaml:"url,omitempty"`
 	Version     string `yaml:"version,omitempty"`
 	ProfileName string `yaml:"profile_name,omitempty"`
 
-	AutoUpdateHours int             `yaml:"auto_update_hours,omitempty"`
-	Language        string          `yaml:"language,omitempty"`
-	CurrentProfile  string          `yaml:"current_profile,omitempty"`
-	Profiles        []ConfigProfile `yaml:"profiles,omitempty"`
+	AutoUpdateHours int               `yaml:"auto_update_hours,omitempty"`
+	Language        string            `yaml:"language,omitempty"`
+	CurrentProfile  string            `yaml:"current_profile,omitempty"`
+	Profiles        []ConfigProfile   `yaml:"profiles,omitempty"`
+	SingboxEnv      map[string]string `yaml:"singbox-env,omitempty"`
 }
 
 type appConfigPersist struct {
-	AutoUpdateHours int             `yaml:"auto_update_hours"`
-	Language        string          `yaml:"language"`
-	CurrentProfile  string          `yaml:"current_profile"`
-	Profiles        []ConfigProfile `yaml:"profiles"`
+	AutoUpdateHours int               `yaml:"auto_update_hours"`
+	Language        string            `yaml:"language"`
+	CurrentProfile  string            `yaml:"current_profile"`
+	Profiles        []ConfigProfile   `yaml:"profiles"`
+	SingboxEnv      map[string]string `yaml:"singbox-env,omitempty"`
 }
 
 func (c AppConfig) MarshalYAML() (interface{}, error) {
@@ -45,6 +52,7 @@ func (c AppConfig) MarshalYAML() (interface{}, error) {
 		Language:        cfg.Language,
 		CurrentProfile:  cfg.CurrentProfile,
 		Profiles:        cfg.Profiles,
+		SingboxEnv:      cfg.SingboxEnv,
 	}, nil
 }
 
@@ -110,6 +118,7 @@ func defaultAppConfig() AppConfig {
 		AutoUpdateHours: defaultAutoUpdateHrs,
 		Language:        defaultAppLanguage,
 		CurrentProfile:  "default",
+		SingboxEnv:      cloneEnvMap(defaultSingBoxEnv),
 		Profiles: []ConfigProfile{
 			{
 				Name:    "default",
@@ -128,6 +137,7 @@ func normalizeConfigProfiles(cfg *AppConfig) {
 	}
 	cfg.AutoUpdateHours = normalizeAutoUpdateHours(cfg.AutoUpdateHours)
 	cfg.Language = normalizeAppLanguage(cfg.Language)
+	cfg.SingboxEnv = normalizeSingboxEnv(cfg.SingboxEnv)
 
 	if len(cfg.Profiles) == 0 {
 		name := sanitizeProfileName(cfg.ProfileName)
@@ -185,6 +195,35 @@ func normalizeConfigProfiles(cfg *AppConfig) {
 	}
 	cfg.CurrentProfile = cfg.Profiles[idx].Name
 	syncLegacyFromCurrent(cfg)
+}
+
+func normalizeSingboxEnv(raw map[string]string) map[string]string {
+	if len(raw) == 0 {
+		return nil
+	}
+	normalized := make(map[string]string, len(raw))
+	for k, v := range raw {
+		key := strings.TrimSpace(k)
+		if key == "" {
+			continue
+		}
+		normalized[key] = strings.TrimSpace(v)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
+}
+
+func cloneEnvMap(raw map[string]string) map[string]string {
+	if len(raw) == 0 {
+		return nil
+	}
+	cloned := make(map[string]string, len(raw))
+	for k, v := range raw {
+		cloned[k] = v
+	}
+	return cloned
 }
 
 func normalizeAutoUpdateHours(raw int) int {
