@@ -13,6 +13,14 @@ import (
 	"github.com/lxn/walk"
 )
 
+var logLineBreakReplacer = strings.NewReplacer(
+	`\r\n`, "\n",
+	`\n`, "\n",
+	`\r`, "\n",
+	"\r\n", "\n",
+	"\r", "\n",
+)
+
 func (a *App) pipeLogs(r io.Reader) {
 	scanner := bufio.NewScanner(r)
 	buf := make([]byte, 0, 64*1024)
@@ -50,11 +58,7 @@ func normalizeLogChunks(line string) []string {
 		return nil
 	}
 
-	line = strings.ReplaceAll(line, `\r\n`, "\n")
-	line = strings.ReplaceAll(line, `\n`, "\n")
-	line = strings.ReplaceAll(line, `\r`, "\n")
-	line = strings.ReplaceAll(line, "\r\n", "\n")
-	line = strings.ReplaceAll(line, "\r", "\n")
+	line = logLineBreakReplacer.Replace(line)
 
 	raw := strings.Split(line, "\n")
 	out := make([]string, 0, len(raw))

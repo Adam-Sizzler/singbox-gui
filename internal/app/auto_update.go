@@ -54,16 +54,9 @@ func (a *App) autoUpdateLoop(stop <-chan struct{}, wake <-chan struct{}) {
 	var timerC <-chan time.Time
 
 	resetTimer := func(delay time.Duration) {
-		if timer != nil {
-			if !timer.Stop() {
-				select {
-				case <-timer.C:
-				default:
-				}
-			}
-			timer = nil
-			timerC = nil
-		}
+		stopAndDrainTimer(timer)
+		timer = nil
+		timerC = nil
 		if delay <= 0 {
 			return
 		}
@@ -75,20 +68,25 @@ func (a *App) autoUpdateLoop(stop <-chan struct{}, wake <-chan struct{}) {
 	for {
 		select {
 		case <-stop:
-			if timer != nil {
-				if !timer.Stop() {
-					select {
-					case <-timer.C:
-					default:
-					}
-				}
-			}
+			stopAndDrainTimer(timer)
 			return
 		case <-wake:
 			resetTimer(a.autoUpdateDelay())
 		case <-timerC:
 			a.runAutoUpdateOnce()
 			resetTimer(a.autoUpdateDelay())
+		}
+	}
+}
+
+func stopAndDrainTimer(timer *time.Timer) {
+	if timer == nil {
+		return
+	}
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
 		}
 	}
 }
