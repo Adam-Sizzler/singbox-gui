@@ -78,6 +78,41 @@ func relaunchElevated() error {
 	return nil
 }
 
+func openURLInDefaultBrowser(rawURL string) error {
+	target := strings.TrimSpace(rawURL)
+	if target == "" {
+		return fmt.Errorf("пустой URL")
+	}
+
+	verbPtr, err := syscall.UTF16PtrFromString("open")
+	if err != nil {
+		return err
+	}
+	targetPtr, err := syscall.UTF16PtrFromString(target)
+	if err != nil {
+		return err
+	}
+
+	shell32 := syscall.NewLazyDLL("shell32.dll")
+	shellExecuteW := shell32.NewProc("ShellExecuteW")
+	ret, _, callErr := shellExecuteW.Call(
+		0,
+		uintptr(unsafe.Pointer(verbPtr)),
+		uintptr(unsafe.Pointer(targetPtr)),
+		0,
+		0,
+		1,
+	)
+
+	if ret <= 32 {
+		if callErr != syscall.Errno(0) {
+			return fmt.Errorf("ShellExecuteW ret=%d: %w", ret, callErr)
+		}
+		return fmt.Errorf("ShellExecuteW ret=%d", ret)
+	}
+	return nil
+}
+
 func ensureSingBoxProtocolRegistration() error {
 	exePath, err := os.Executable()
 	if err != nil {

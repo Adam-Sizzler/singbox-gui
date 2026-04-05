@@ -22,6 +22,7 @@
   var logsNode = document.getElementById("logs");
   var settingsTitleNode = document.getElementById("settingsTitle");
   var logsTitleNode = document.getElementById("logsTitle");
+  var releaseTagLinkNode = document.getElementById("releaseTagLink");
   var labelUrlNode = document.getElementById("labelUrl");
   var labelVersionNode = document.getElementById("labelVersion");
   var labelAutoUpdateNode = document.getElementById("labelAutoUpdate");
@@ -56,6 +57,11 @@
   var lastProtoWarn = "";
   var lastAutoUpdateHours = 12;
   var lastUptimeSeconds = 0;
+  var lastAppReleaseTag = "";
+  var lastAppReleaseURL = "";
+  var lastAppUpdateAvailable = false;
+  var lastAppLatestReleaseTag = "";
+  var lastAppLatestReleaseURL = "";
   var confirmAction = null;
   var STATE_POLL_MS = 1500;
   var LOGS_POLL_MS = 400;
@@ -203,6 +209,7 @@
     if (confirmCancelBtn) confirmCancelBtn.textContent = tr("cancel");
     if (confirmOkBtn) confirmOkBtn.textContent = tr("deleteAction");
     renderUptime(lastUptimeSeconds, lastRunning);
+    renderAppReleaseTag(lastAppReleaseTag, lastAppReleaseURL, lastAppUpdateAvailable, lastAppLatestReleaseTag, lastAppLatestReleaseURL);
 
     if (langRuBtn) {
       langRuBtn.className = currentLanguage === "ru" ? "control lang-btn active" : "control lang-btn";
@@ -214,6 +221,37 @@
     if (mobileActionsToggleBtn) {
       mobileActionsToggleBtn.setAttribute("aria-label", tr("actionsMenu"));
     }
+  }
+
+  function renderAppReleaseTag(tag, link, hasUpdate, latestTag, latestLink) {
+    if (!releaseTagLinkNode) return;
+    var normalizedTag = String(tag || "").trim();
+    var normalizedLink = String(link || "").trim();
+    var normalizedLatestTag = String(latestTag || "").trim();
+    var normalizedLatestLink = String(latestLink || "").trim();
+    var updateAvailable = !!hasUpdate;
+    if (!normalizedTag || !normalizedLink) {
+      releaseTagLinkNode.hidden = true;
+      releaseTagLinkNode.removeAttribute("href");
+      releaseTagLinkNode.textContent = "";
+      releaseTagLinkNode.title = "";
+      releaseTagLinkNode.className = "release-tag-link";
+      return;
+    }
+    releaseTagLinkNode.hidden = false;
+    releaseTagLinkNode.textContent = normalizedTag;
+    if (updateAvailable && normalizedLatestLink) {
+      releaseTagLinkNode.href = normalizedLatestLink;
+    } else {
+      releaseTagLinkNode.href = normalizedLink;
+    }
+    if (updateAvailable && normalizedLatestTag) {
+      releaseTagLinkNode.title = normalizedTag + " -> " + normalizedLatestTag;
+      releaseTagLinkNode.className = "release-tag-link has-update";
+      return;
+    }
+    releaseTagLinkNode.title = normalizedTag;
+    releaseTagLinkNode.className = "release-tag-link";
   }
 
   function renderDefaultStatus(protoWarn) {
@@ -559,6 +597,11 @@
     lastBusy = !!state.busy;
     lastUptimeSeconds = parseInt(state.uptime_seconds || 0, 10);
     if (isNaN(lastUptimeSeconds) || lastUptimeSeconds < 0) lastUptimeSeconds = 0;
+    lastAppReleaseTag = String(state.app_release_tag || "").trim();
+    lastAppReleaseURL = String(state.app_release_url || "").trim();
+    lastAppUpdateAvailable = !!state.app_update_available;
+    lastAppLatestReleaseTag = String(state.app_latest_release_tag || "").trim();
+    lastAppLatestReleaseURL = String(state.app_latest_release_url || "").trim();
     startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
     startStopBtn.disabled = lastBusy;
     setCheckButtonsDisabled(lastBusy);

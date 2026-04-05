@@ -3,9 +3,11 @@
 package app
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -80,6 +82,26 @@ func (a *App) runUI() error {
 				OnNavigatedError: func(*walk.WebViewNavigatedErrorEventData) {
 					showMainWindow()
 				},
+				OnNavigating: func(eventData *walk.WebViewNavigatingEventData) {
+					if eventData == nil {
+						return
+					}
+					if a.tryOpenExternalURL(eventData.Url()) {
+						eventData.SetCanceled(true)
+					}
+				},
+				OnNewWindow: func(eventData *walk.WebViewNewWindowEventData) {
+					if eventData == nil {
+						return
+					}
+					target := strings.TrimSpace(eventData.Url())
+					if target == "" {
+						target = strings.TrimSpace(eventData.UrlContext())
+					}
+					if a.tryOpenExternalURL(target) {
+						eventData.SetCanceled(true)
+					}
+				},
 			},
 		},
 	}
@@ -134,6 +156,41 @@ func (a *App) runUI() error {
 
 	a.mw.Run()
 	return nil
+}
+
+func (a *App) tryOpenExternalURL(rawTarget string) bool {
+	if !a.shouldOpenInSystemBrowser(rawTarget) {
+		return false
+	}
+	if err := openURLInDefaultBrowser(rawTarget); err != nil {
+		a.log("WARN: не удалось открыть ссылку во внешнем браузере: %v", err)
+	}
+	return true
+}
+
+func (a *App) shouldOpenInSystemBrowser(rawTarget string) bool {
+	target := strings.TrimSpace(rawTarget)
+	if target == "" {
+		return false
+	}
+
+	targetURL, err := url.Parse(target)
+	if err != nil || !targetURL.IsAbs() {
+		return false
+	}
+
+	scheme := strings.ToLower(strings.TrimSpace(targetURL.Scheme))
+	if scheme != "http" && scheme != "https" {
+		return false
+	}
+
+	if baseURL, err := url.Parse(strings.TrimSpace(a.uiBaseURL)); err == nil && baseURL.IsAbs() {
+		if strings.EqualFold(targetURL.Scheme, baseURL.Scheme) && strings.EqualFold(targetURL.Host, baseURL.Host) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (a *App) applyMainWindowIcon() {

@@ -384,6 +384,41 @@ input.control::-ms-clear {
   white-space: nowrap;
 }
 
+.release-tag-link {
+  display: inline-block;
+  height: 32px;
+  line-height: 32px;
+  border-radius: 8px;
+  padding: 0 10px;
+  margin-right: 8px;
+  background: #1f1f1f;
+  color: #d9d9d9;
+  text-decoration: none;
+}
+
+.release-tag-link:hover {
+  background: #272727;
+  color: #f3f3f3;
+}
+
+.release-tag-link:active {
+  background: #171717;
+}
+
+.release-tag-link.has-update {
+  background: #274a2f;
+  color: #c7f4d2;
+}
+
+.release-tag-link.has-update:hover {
+  background: #2f5a39;
+  color: #e4ffea;
+}
+
+.release-tag-link.has-update:active {
+  background: #23442c;
+}
+
 .lang-btn {
   width: 58px;
   text-align: center;

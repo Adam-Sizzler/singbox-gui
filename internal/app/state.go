@@ -83,6 +83,14 @@ type App struct {
 	autoUpdateStop chan struct{}
 	autoUpdateWake chan struct{}
 
+	appUpdateMu          sync.Mutex
+	appUpdateChecking    bool
+	appUpdateCheckedAt   time.Time
+	appUpdateNextCheckAt time.Time
+	appUpdateAvailable   bool
+	appLatestReleaseTag  string
+	appLatestReleaseURL  string
+
 	themeWatchStop chan struct{}
 	systemDark     bool
 }
@@ -93,16 +101,21 @@ type logEntry struct {
 }
 
 type AppState struct {
-	CurrentProfile  string          `json:"current_profile"`
-	Profiles        []ConfigProfile `json:"profiles"`
-	Language        string          `json:"language"`
-	URL             string          `json:"url"`
-	Version         string          `json:"version"`
-	AutoUpdateHours int             `json:"auto_update_hours"`
-	UptimeSeconds   int64           `json:"uptime_seconds"`
-	Running         bool            `json:"running"`
-	Busy            bool            `json:"busy"`
-	ProtoRegWarn    string          `json:"proto_reg_warn,omitempty"`
+	CurrentProfile      string          `json:"current_profile"`
+	Profiles            []ConfigProfile `json:"profiles"`
+	Language            string          `json:"language"`
+	URL                 string          `json:"url"`
+	Version             string          `json:"version"`
+	AutoUpdateHours     int             `json:"auto_update_hours"`
+	UptimeSeconds       int64           `json:"uptime_seconds"`
+	Running             bool            `json:"running"`
+	Busy                bool            `json:"busy"`
+	ProtoRegWarn        string          `json:"proto_reg_warn,omitempty"`
+	AppReleaseTag       string          `json:"app_release_tag,omitempty"`
+	AppReleaseURL       string          `json:"app_release_url,omitempty"`
+	AppUpdateAvailable  bool            `json:"app_update_available"`
+	AppLatestReleaseTag string          `json:"app_latest_release_tag,omitempty"`
+	AppLatestReleaseURL string          `json:"app_latest_release_url,omitempty"`
 }
 
 func (a *App) setConfig(cfg AppConfig) {
@@ -138,17 +151,24 @@ func (a *App) snapshotState() AppState {
 	busy := a.runningAction
 	a.runMu.Unlock()
 
+	appUpdateAvailable, appLatestTag, appLatestURL := a.appUpdateSnapshot()
+
 	return AppState{
-		CurrentProfile:  cfg.CurrentProfile,
-		Profiles:        append([]ConfigProfile(nil), cfg.Profiles...),
-		Language:        cfg.Language,
-		URL:             active.URL,
-		Version:         active.Version,
-		AutoUpdateHours: cfg.AutoUpdateHours,
-		UptimeSeconds:   a.processUptimeSeconds(),
-		Running:         a.isProcessRunning(),
-		Busy:            busy,
-		ProtoRegWarn:    a.protoRegWarn,
+		CurrentProfile:      cfg.CurrentProfile,
+		Profiles:            append([]ConfigProfile(nil), cfg.Profiles...),
+		Language:            cfg.Language,
+		URL:                 active.URL,
+		Version:             active.Version,
+		AutoUpdateHours:     cfg.AutoUpdateHours,
+		UptimeSeconds:       a.processUptimeSeconds(),
+		Running:             a.isProcessRunning(),
+		Busy:                busy,
+		ProtoRegWarn:        a.protoRegWarn,
+		AppReleaseTag:       currentAppReleaseTag(),
+		AppReleaseURL:       currentAppReleaseURL(),
+		AppUpdateAvailable:  appUpdateAvailable,
+		AppLatestReleaseTag: appLatestTag,
+		AppLatestReleaseURL: appLatestURL,
 	}
 }
 
