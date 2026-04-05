@@ -1,6 +1,7 @@
 html,
 body {
   width: 100%;
+  min-height: 100vh;
   height: 100%;
   margin: 0;
   padding: 0;
@@ -29,7 +30,8 @@ body {
 
 .app {
   width: 100%;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   padding: 10px;
   overflow: hidden;
   display: -ms-flexbox;
@@ -47,6 +49,7 @@ body {
   margin: 0 0 8px;
   -ms-flex: 0 0 auto;
   flex: 0 0 auto;
+  min-width: 0;
 }
 
 .panel h1,
@@ -77,6 +80,8 @@ body {
   align-items: center;
   width: 100%;
   margin-bottom: 8px;
+  min-width: 0;
+  gap: 0;
 }
 
 .field-label {
@@ -90,6 +95,8 @@ body {
   vertical-align: middle;
   color: inherit;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .field-control {
@@ -140,6 +147,8 @@ body {
   padding-right: 0;
   margin-right: 8px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .half-block-left .half-label {
@@ -173,6 +182,7 @@ body {
   font-size: 15px;
   line-height: 32px;
   vertical-align: middle;
+  min-width: 0;
 }
 
 button.control,
@@ -347,13 +357,14 @@ input.control::-ms-clear {
 #newProfile,
 #deleteProfile,
 #checkConfig,
-#startStop,
-#copyLogs {
-  width: 120px;
+#startStop {
+  min-width: 104px;
+  width: auto;
 }
 
 #copyLogs {
-  width: 156px;
+  min-width: 132px;
+  width: auto;
 }
 
 .profile-actions .control + .control {
@@ -395,7 +406,9 @@ input.control::-ms-clear {
   -ms-flex-align: center;
   display: flex;
   align-items: center;
-  white-space: nowrap;
+  -ms-flex-wrap: wrap;
+  flex-wrap: wrap;
+  white-space: normal;
 }
 
 .run-controls .control + .control {
@@ -404,17 +417,20 @@ input.control::-ms-clear {
 
 .status {
   display: block;
-  margin-left: 8px;
+  margin-left: 0;
   min-height: 20px;
   vertical-align: middle;
   color: inherit;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .uptime {
   display: block;
-  margin-left: 10px;
+  margin-left: 0;
   min-width: 120px;
   color: #d9d9d9;
+  white-space: nowrap;
 }
 
 .logs-header {
@@ -436,8 +452,6 @@ input.control::-ms-clear {
   -ms-flex: 1 1 auto;
   flex: 1 1 auto;
   min-height: 0;
-  height: 100%;
-  max-height: 100%;
   overflow: hidden;
   display: -ms-flexbox;
   -ms-flex-direction: column;
@@ -449,9 +463,7 @@ input.control::-ms-clear {
   width: 100%;
   -ms-flex: 1 1 auto;
   flex: 1 1 auto;
-  min-height: 0;
-  height: auto;
-  max-height: 100%;
+  min-height: 120px;
   overflow-y: auto;
   overflow-x: hidden;
   -ms-overflow-style: scrollbar;
@@ -532,6 +544,89 @@ input.control::-ms-clear {
   color: #f3f3f3;
 }
 
+.confirm-modal {
+  position: fixed;
+  z-index: 120;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: block;
+}
+
+.confirm-modal[hidden] {
+  display: none;
+}
+
+.confirm-modal-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.confirm-modal-dialog {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 460px;
+  max-width: calc(100% - 20px);
+  transform: translate(-50%, -50%);
+  border-radius: 10px;
+  background: #2b2b2b;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid #1f1f1f;
+  overflow: hidden;
+}
+
+.confirm-modal-header {
+  padding: 8px;
+  border-bottom: 1px solid #1f1f1f;
+}
+
+.confirm-modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.confirm-modal-message {
+  padding: 8px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.confirm-modal-actions {
+  display: -ms-flexbox;
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px;
+  border-top: 1px solid #1f1f1f;
+}
+
+.confirm-modal-actions .control {
+  min-width: 104px;
+  width: auto;
+}
+
+.confirm-modal-actions .control + .control {
+  margin-left: 8px;
+}
+
+button.control.danger {
+  background: #7b2424 !important;
+}
+
+button.control.danger:hover {
+  background: #8b2b2b !important;
+}
+
+button.control.danger:active {
+  background: #641b1b !important;
+}
+
 html::-webkit-scrollbar,
 body::-webkit-scrollbar,
 #logs::-webkit-scrollbar,
@@ -563,7 +658,61 @@ body::-webkit-scrollbar-thumb:hover,
   background: #272727;
 }
 
+@media (max-width: 980px) {
+  .field-label {
+    -ms-flex: 0 0 120px;
+    flex: 0 0 120px;
+    width: 120px;
+    min-width: 120px;
+    max-width: 120px;
+  }
+
+  .half-block-left .half-label {
+    margin-right: 16px;
+  }
+
+  #newProfile,
+  #deleteProfile,
+  #checkConfig,
+  #startStop {
+    min-width: 96px;
+  }
+
+  #copyLogs {
+    min-width: 120px;
+  }
+}
+
 @media (max-width: 760px) {
+  .field-row {
+    display: block;
+  }
+
+  .field-label {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    padding-right: 0;
+    margin-bottom: 8px;
+  }
+
+  .profile-controls {
+    display: block;
+  }
+
+  .profile-actions {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 8px;
+  }
+
+  .profile-actions .control {
+    -ms-flex: 1 1 0px;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+
   .halves-row {
     display: block;
   }
@@ -577,5 +726,56 @@ body::-webkit-scrollbar-thumb:hover,
 
   .half-block-right {
     margin-top: 8px;
+  }
+
+  .half-block-left .half-label {
+    margin-right: 8px;
+  }
+
+  .run-controls {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  #checkConfig,
+  #startStop {
+    -ms-flex: 1 1 calc(50% - 4px);
+    flex: 1 1 calc(50% - 4px);
+    width: auto;
+  }
+
+  .status,
+  .uptime {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .logs-header {
+    -ms-flex-wrap: wrap;
+    flex-wrap: wrap;
+  }
+
+  #copyLogs {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .confirm-modal-actions {
+    justify-content: stretch;
+  }
+
+  .confirm-modal-actions .control {
+    -ms-flex: 1 1 0px;
+    flex: 1 1 0;
+    width: auto;
+  }
+
+  .confirm-modal-actions .control + .control {
+    margin-left: 0;
+  }
+
+  .profile-actions .control + .control,
+  .run-controls .control + .control {
+    margin-left: 0;
   }
 }

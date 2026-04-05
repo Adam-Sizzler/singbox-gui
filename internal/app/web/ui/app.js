@@ -23,6 +23,12 @@
   var labelRunCheckNode = document.getElementById("labelRunCheck");
   var langRuBtn = document.getElementById("langRu");
   var langEnBtn = document.getElementById("langEn");
+  var confirmModal = document.getElementById("confirmModal");
+  var confirmModalOverlay = document.getElementById("confirmModalOverlay");
+  var confirmTitleNode = document.getElementById("confirmTitle");
+  var confirmMessageNode = document.getElementById("confirmMessage");
+  var confirmCancelBtn = document.getElementById("confirmCancel");
+  var confirmOkBtn = document.getElementById("confirmOk");
 
   var lastLogId = 0;
   var stateTimer = null;
@@ -39,6 +45,7 @@
   var lastProtoWarn = "";
   var lastAutoUpdateHours = 12;
   var lastUptimeSeconds = 0;
+  var confirmAction = null;
 
   var I18N = {
     ru: {
@@ -62,6 +69,9 @@
       uptime: "Аптайм",
       statusLogsCopied: "Логи скопированы в буфер обмена",
       confirmDelete: "Удалить текущий профиль?",
+      confirmTitle: "Подтверждение",
+      cancel: "Отмена",
+      deleteAction: "Удалить",
       warnPrefix: "WARN: ",
       errorPrefix: "ERROR: "
     },
@@ -86,6 +96,9 @@
       uptime: "Uptime",
       statusLogsCopied: "Logs copied to clipboard",
       confirmDelete: "Delete current profile?",
+      confirmTitle: "Confirmation",
+      cancel: "Cancel",
+      deleteAction: "Delete",
       warnPrefix: "WARN: ",
       errorPrefix: "ERROR: "
     }
@@ -168,6 +181,9 @@
     if (deleteProfileBtn) deleteProfileBtn.textContent = tr("deleteProfile");
     if (copyLogsBtn) copyLogsBtn.textContent = tr("copyLogs");
     if (startStopBtn) startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
+    if (confirmTitleNode) confirmTitleNode.textContent = tr("confirmTitle");
+    if (confirmCancelBtn) confirmCancelBtn.textContent = tr("cancel");
+    if (confirmOkBtn) confirmOkBtn.textContent = tr("deleteAction");
     renderUptime(lastUptimeSeconds, lastRunning);
 
     if (langRuBtn) {
@@ -310,6 +326,43 @@
     openProfileMenu();
   }
 
+  function isConfirmModalOpen() {
+    return !!confirmModal && !confirmModal.hidden;
+  }
+
+  function closeConfirmModal() {
+    if (!confirmModal || confirmModal.hidden) return;
+    confirmModal.hidden = true;
+    confirmAction = null;
+  }
+
+  function openConfirmModal(message, onConfirm) {
+    if (!confirmModal || !confirmMessageNode) {
+      if (window.confirm(message || tr("confirmDelete"))) {
+        if (typeof onConfirm === "function") onConfirm();
+      }
+      return;
+    }
+
+    confirmMessageNode.textContent = message || "";
+    confirmAction = typeof onConfirm === "function" ? onConfirm : null;
+    confirmModal.hidden = false;
+    if (confirmCancelBtn && confirmCancelBtn.focus) {
+      try {
+        confirmCancelBtn.focus();
+      } catch (e) {}
+    }
+  }
+
+  function runConfirmAction() {
+    if (!isConfirmModalOpen()) return;
+    var action = confirmAction;
+    closeConfirmModal();
+    if (typeof action === "function") {
+      action();
+    }
+  }
+
   function renderState(state) {
     loadingState = true;
 
@@ -363,7 +416,6 @@
     renderDefaultStatus(lastProtoWarn);
 
     loadingState = false;
-    resizeLogs();
   }
 
   function refreshState() {
@@ -532,17 +584,6 @@
     }
   }
 
-  function resizeLogs() {
-    if (!logsNode || !logsNode.getBoundingClientRect) return;
-    var rect = logsNode.getBoundingClientRect();
-    var vh = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight || 0;
-    var available = vh - rect.top - 10;
-    if (available < 120) {
-      available = 120;
-    }
-    logsNode.style.height = String(Math.floor(available)) + "px";
-  }
-
   function pollLogs() {
     api("GET", "/api/logs?from=" + lastLogId, null, function (err, data) {
       if (err) {
@@ -580,10 +621,42 @@
 
   document.addEventListener("keydown", function (e) {
     var key = e.key || "";
-    if (key === "Escape" && profileMenuOpened) {
-      closeProfileMenu();
+    if (key === "Escape") {
+      if (profileMenuOpened) {
+        closeProfileMenu();
+      }
+      if (isConfirmModalOpen()) {
+        if (e.preventDefault) e.preventDefault();
+        closeConfirmModal();
+      }
+      return;
+    }
+
+    if ((key === "Enter" || key === "NumpadEnter") && isConfirmModalOpen()) {
+      if (document.activeElement !== confirmCancelBtn) {
+        if (e.preventDefault) e.preventDefault();
+        runConfirmAction();
+      }
     }
   });
+
+  if (confirmModalOverlay) {
+    confirmModalOverlay.onclick = function () {
+      closeConfirmModal();
+    };
+  }
+
+  if (confirmCancelBtn) {
+    confirmCancelBtn.onclick = function () {
+      closeConfirmModal();
+    };
+  }
+
+  if (confirmOkBtn) {
+    confirmOkBtn.onclick = function () {
+      runConfirmAction();
+    };
+  }
 
   langRuBtn.onclick = function () {
     if (currentLanguage === "ru") return;
@@ -624,13 +697,15 @@
   };
 
   deleteProfileBtn.onclick = function () {
-    if (!window.confirm(tr("confirmDelete"))) return;
-    api("POST", "/api/profile/delete", { name: selectedProfile }, function (err, state) {
-      if (err) {
-        setStatus(tr("errorPrefix") + err.message);
-        return;
-      }
-      renderState(state);
+    if (lastBusy) return;
+    openConfirmModal(tr("confirmDelete"), function () {
+      api("POST", "/api/profile/delete", { name: selectedProfile }, function (err, state) {
+        if (err) {
+          setStatus(tr("errorPrefix") + err.message);
+          return;
+        }
+        renderState(state);
+      });
     });
   };
 
@@ -677,15 +752,14 @@
 
   refreshState();
   pollLogs();
-  resizeLogs();
 
   stateTimer = setInterval(refreshState, 1500);
   logsTimer = setInterval(pollLogs, 400);
-  window.onresize = resizeLogs;
 
   window.onbeforeunload = function () {
     if (stateTimer) clearInterval(stateTimer);
     if (logsTimer) clearInterval(logsTimer);
     if (saveTimer) clearTimeout(saveTimer);
+    closeConfirmModal();
   };
 })();
