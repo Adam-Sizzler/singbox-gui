@@ -48,16 +48,38 @@ func (a *App) runUI() error {
 		}
 	}()
 
+	uiURL := a.uiBaseURL + "/?ts=" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	uiShown := false
+	showMainWindow := func() {
+		if uiShown || a.mw == nil {
+			return
+		}
+		uiShown = true
+		a.applyNativeDarkHints(a.systemDark)
+		a.mw.Show()
+		a.mw.BringToTop()
+	}
+
 	decl := MainWindow{
 		AssignTo: &a.mw,
 		Title:    "Sing-box GUI",
 		Size:     Size{Width: 900, Height: 560},
 		MinSize:  Size{Width: 780, Height: 460},
-		Layout:   VBox{MarginsZero: true, SpacingZero: true},
+		Visible:  false,
+		Background: SolidColorBrush{
+			Color: walk.RGB(43, 43, 43),
+		},
+		Layout: VBox{MarginsZero: true, SpacingZero: true},
 		Children: []Widget{
 			WebView{
 				AssignTo:      &a.web,
 				StretchFactor: 1,
+				OnDocumentCompleted: func(string) {
+					showMainWindow()
+				},
+				OnNavigatedError: func(*walk.WebViewNavigatedErrorEventData) {
+					showMainWindow()
+				},
 			},
 		},
 	}
@@ -74,7 +96,12 @@ func (a *App) runUI() error {
 
 	a.applyNativeDarkHints(a.systemDark)
 	if a.web != nil {
-		_ = a.web.SetURL(a.uiBaseURL + "/?ts=" + strconv.FormatInt(time.Now().UnixNano(), 10))
+		if err := a.web.SetURL(uiURL); err != nil {
+			a.log("WARN: не удалось открыть UI страницу: %v", err)
+			showMainWindow()
+		}
+	} else {
+		showMainWindow()
 	}
 
 	if a.protoRegWarn != "" {
@@ -84,6 +111,7 @@ func (a *App) runUI() error {
 		a.log("Получен import URI из аргумента запуска")
 	}
 
+	a.startAutoUpdateScheduler()
 	a.startSystemThemeWatcher()
 	go func() {
 		for i := 0; i < 4; i++ {
@@ -98,6 +126,7 @@ func (a *App) runUI() error {
 	}()
 
 	a.mw.Closing().Attach(func(canceled *bool, reason walk.CloseReason) {
+		a.stopAutoUpdateScheduler()
 		a.stopSystemThemeWatcher()
 		a.stopUIServer()
 		a.stopProcess()

@@ -46,6 +46,7 @@ func (a *App) startUIServer() error {
 	mux.HandleFunc("/api/state", a.handleAPIState)
 	mux.HandleFunc("/api/profile/new", a.handleAPIProfileNew)
 	mux.HandleFunc("/api/profile/delete", a.handleAPIProfileDelete)
+	mux.HandleFunc("/api/action/check-config", a.handleAPICheckConfig)
 	mux.HandleFunc("/api/action/start-stop", a.handleAPIStartStop)
 	mux.HandleFunc("/api/action/copy-logs", a.handleAPICopyLogs)
 	mux.HandleFunc("/api/logs", a.handleAPILogs)
@@ -164,6 +165,18 @@ func (a *App) handleAPIStartStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.toggleStartStop(); err != nil {
+		writeJSON(w, http.StatusBadRequest, apiError{Error: err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, a.snapshotState())
+}
+
+func (a *App) handleAPICheckConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if err := a.checkConfigAction(); err != nil {
 		writeJSON(w, http.StatusBadRequest, apiError{Error: err.Error()})
 		return
 	}

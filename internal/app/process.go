@@ -27,7 +27,64 @@ func (a *App) isProcessRunning() bool {
 	return a.proc != nil && a.proc.Process != nil
 }
 
+func (a *App) processUptimeSeconds() int64 {
+	a.procMu.Lock()
+	defer a.procMu.Unlock()
+	if a.proc == nil || a.proc.Process == nil || a.procStartedAt.IsZero() {
+		return 0
+	}
+	seconds := int64(time.Since(a.procStartedAt).Seconds())
+	if seconds < 0 {
+		return 0
+	}
+	return seconds
+}
+
 func (a *App) toggleStartStop() error {
+	return a.withRunningAction(func() error {
+		if a.isProcessRunning() {
+			a.stopProcess()
+			return nil
+		}
+		return a.startPipeline()
+	})
+}
+
+func (a *App) checkConfigAction() error {
+	return a.withRunningAction(func() error {
+		cfg := a.getConfigSnapshot()
+		if err := validateConfig(cfg); err != nil {
+			return err
+		}
+
+		active := activeProfileFromConfig(cfg)
+		profileName := strings.TrimSpace(active.Name)
+		if profileName == "" {
+			profileName = "default"
+		}
+
+		resolvedConfigURL, _, err := resolveSubscriptionInput(active.URL)
+		if err != nil {
+			return err
+		}
+
+		if strings.TrimSpace(resolvedConfigURL) == "" {
+			if err := a.ensureLocalRuntimeConfig(); err != nil {
+				return err
+			}
+			a.log("Проверка конфигурации OK: локальный %s валиден (профиль: %s)", runtimeCfgName, profileName)
+			return nil
+		}
+
+		if err := validateRemoteRuntimeConfig(resolvedConfigURL); err != nil {
+			return err
+		}
+		a.log("Проверка конфигурации OK: URL доступен и JSON валиден (профиль: %s)", profileName)
+		return nil
+	})
+}
+
+func (a *App) withRunningAction(fn func() error) error {
 	a.runMu.Lock()
 	if a.runningAction {
 		a.runMu.Unlock()
@@ -40,12 +97,7 @@ func (a *App) toggleStartStop() error {
 		a.runningAction = false
 		a.runMu.Unlock()
 	}()
-
-	if a.isProcessRunning() {
-		a.stopProcess()
-		return nil
-	}
-	return a.startPipeline()
+	return fn()
 }
 
 func (a *App) startPipeline() error {
@@ -80,15 +132,20 @@ func (a *App) startPipeline() error {
 	}
 
 	if strings.TrimSpace(resolvedConfigURL) == "" {
-		if err := ensureLocalRuntimeConfig(a.runtimeCfg); err != nil {
+		if err := a.ensureLocalRuntimeConfig(); err != nil {
 			return err
 		}
 		a.log("URL не задан, использую локальный %s", runtimeCfgName)
 	} else {
-		if err := downloadRuntimeConfig(resolvedConfigURL, a.runtimeCfg); err != nil {
+		updated, err := a.refreshRuntimeConfigFromURL(resolvedConfigURL)
+		if err != nil {
 			return err
 		}
-		a.log("Скачан %s", runtimeCfgName)
+		if updated {
+			a.log("Скачан и обновлён %s", runtimeCfgName)
+		} else {
+			a.log("%s уже актуален", runtimeCfgName)
+		}
 	}
 
 	a.stopProcess()
@@ -98,6 +155,18 @@ func (a *App) startPipeline() error {
 
 	a.log("sing-box запущен")
 	return nil
+}
+
+func (a *App) ensureLocalRuntimeConfig() error {
+	a.runtimeCfgMu.Lock()
+	defer a.runtimeCfgMu.Unlock()
+	return ensureLocalRuntimeConfig(a.runtimeCfg)
+}
+
+func (a *App) refreshRuntimeConfigFromURL(url string) (bool, error) {
+	a.runtimeCfgMu.Lock()
+	defer a.runtimeCfgMu.Unlock()
+	return downloadRuntimeConfig(url, a.runtimeCfg)
 }
 
 func (a *App) ensureSingBox(targetVersion string) error {
@@ -147,6 +216,7 @@ func (a *App) startProcess() error {
 	a.proc = cmd
 	a.procStopRequested = false
 	a.procWaitDone = done
+	a.procStartedAt = time.Now()
 	a.procMu.Unlock()
 
 	go a.pipeLogs(stdout)
@@ -162,6 +232,7 @@ func (a *App) startProcess() error {
 			a.proc = nil
 			a.procStopRequested = false
 			a.procWaitDone = nil
+			a.procStartedAt = time.Time{}
 		}
 		a.procMu.Unlock()
 

@@ -56,23 +56,108 @@ body {
   font-weight: 600;
 }
 
+.panel-header {
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  -ms-flex-pack: justify;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 8px;
+}
+
+.panel-header h1 {
+  margin: 0;
+}
+
 .field-row {
-  display: table;
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  display: flex;
+  align-items: center;
   width: 100%;
   margin-bottom: 8px;
 }
 
 .field-label {
-  display: table-cell;
-  width: 170px;
+  display: block;
+  -ms-flex: 0 0 138px;
+  flex: 0 0 138px;
+  width: 138px;
+  min-width: 138px;
+  max-width: 138px;
+  padding-right: 8px;
   vertical-align: middle;
   color: inherit;
   white-space: nowrap;
 }
 
 .field-control {
-  display: table-cell;
+  display: block;
+  -ms-flex: 1 1 auto;
+  flex: 1 1 auto;
+  min-width: 0;
   vertical-align: middle;
+}
+
+.halves-row {
+  display: -ms-flexbox;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+
+.half-block {
+  display: block;
+  -ms-flex: 1 1 0px;
+  flex: 1 1 0;
+  width: 50%;
+  min-width: 0;
+  vertical-align: middle;
+}
+
+.half-block-left {
+  padding-right: 4px;
+}
+
+.half-block-right {
+  padding-left: 4px;
+}
+
+.half-content {
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.half-label {
+  -ms-flex: 0 0 auto;
+  flex: 0 0 auto;
+  padding-right: 0;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
+.half-block-left .half-label {
+  margin-right: 50px;
+}
+
+.half-control {
+  display: block;
+  -ms-flex: 1 1 0px;
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.half-control .control {
+  display: block;
+  width: 100%;
+  max-width: none;
 }
 
 .control {
@@ -132,8 +217,7 @@ input.control::-ms-clear {
   height: 0;
 }
 
-#url,
-#version {
+#url {
   width: 100%;
 }
 
@@ -249,18 +333,20 @@ input.control::-ms-clear {
 }
 
 .profile-actions {
-  display: block;
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  display: flex;
+  align-items: center;
   -ms-flex: 0 0 auto;
   flex: 0 0 auto;
   width: auto;
-  text-align: right;
   white-space: nowrap;
-  vertical-align: middle;
   margin-left: 8px;
 }
 
 #newProfile,
 #deleteProfile,
+#checkConfig,
 #startStop,
 #copyLogs {
   width: 120px;
@@ -270,12 +356,15 @@ input.control::-ms-clear {
   width: 156px;
 }
 
-.profile-actions .control + .control,
-#copyLogs {
+.profile-actions .control + .control {
   margin-left: 8px;
 }
 
 .lang-switch {
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  display: flex;
+  align-items: center;
   white-space: nowrap;
 }
 
@@ -289,6 +378,11 @@ input.control::-ms-clear {
   margin-left: 8px;
 }
 
+.profile-actions .control,
+.run-controls .control {
+  margin: 0;
+}
+
 .lang-btn.active,
 .lang-btn.active:hover,
 .lang-btn.active:active {
@@ -296,16 +390,45 @@ input.control::-ms-clear {
   cursor: default;
 }
 
-.actions {
+.run-controls {
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  display: flex;
+  align-items: center;
   white-space: nowrap;
 }
 
+.run-controls .control + .control {
+  margin-left: 8px;
+}
+
 .status {
-  display: inline-block;
+  display: block;
   margin-left: 8px;
   min-height: 20px;
   vertical-align: middle;
   color: inherit;
+}
+
+.uptime {
+  display: block;
+  margin-left: 10px;
+  min-width: 120px;
+  color: #d9d9d9;
+}
+
+.logs-header {
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  -ms-flex-pack: justify;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 8px;
+}
+
+.logs-header h2 {
+  margin: 0;
 }
 
 .logs-panel {
@@ -438,4 +561,21 @@ body::-webkit-scrollbar-thumb:hover,
 #logs::-webkit-scrollbar-thumb:hover,
 .profile-menu::-webkit-scrollbar-thumb:hover {
   background: #272727;
+}
+
+@media (max-width: 760px) {
+  .halves-row {
+    display: block;
+  }
+
+  .half-block {
+    display: block;
+    width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .half-block-right {
+    margin-top: 8px;
+  }
 }

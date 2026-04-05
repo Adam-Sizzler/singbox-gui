@@ -10,21 +10,13 @@
 <body>
   <div class="app">
     <section class="panel">
-      <h1 id="settingsTitle">Настройки</h1>
-      <div class="field-row">
-        <label class="field-label" id="labelUrl" for="url">Config URL:</label>
-        <div class="field-control">
-          <input class="control" id="url" type="text" autocomplete="off">
+      <div class="panel-header">
+        <h1 id="settingsTitle">Настройки</h1>
+        <div class="lang-switch">
+          <button class="control lang-btn" id="langRu" type="button">RU</button>
+          <button class="control lang-btn" id="langEn" type="button">EN</button>
         </div>
       </div>
-
-      <div class="field-row">
-        <label class="field-label" id="labelVersion" for="version">Версия sing-box:</label>
-        <div class="field-control">
-          <input class="control" id="version" type="text" autocomplete="off">
-        </div>
-      </div>
-
       <div class="field-row">
         <label class="field-label" id="labelProfile" for="profilePicker">Профиль:</label>
         <div class="field-control">
@@ -45,24 +37,49 @@
       </div>
 
       <div class="field-row">
-        <label class="field-label" id="labelLanguage" for="langRu">Язык:</label>
+        <label class="field-label" id="labelUrl" for="url">Ссылка:</label>
         <div class="field-control">
-          <div class="lang-switch">
-            <button class="control lang-btn" id="langRu" type="button">RU</button>
-            <button class="control lang-btn" id="langEn" type="button">EN</button>
+          <input class="control" id="url" type="text" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="halves-row">
+        <div class="half-block half-block-left">
+          <div class="half-content">
+            <label class="half-label" id="labelVersion" for="version">Версия ядра:</label>
+            <div class="half-control">
+              <input class="control" id="version" type="text" autocomplete="off">
+            </div>
+          </div>
+        </div>
+        <div class="half-block half-block-right">
+          <div class="half-content">
+            <label class="half-label" id="labelAutoUpdate" for="autoUpdateHours">Автообновление (часы):</label>
+            <div class="half-control">
+              <input class="control" id="autoUpdateHours" type="number" min="0" step="1" autocomplete="off">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <label class="field-label" id="labelRunCheck" for="checkConfig">Запуск/проверка:</label>
+        <div class="field-control">
+          <div class="run-controls">
+            <button class="control" id="checkConfig" type="button">Проверить</button>
+            <button class="control" id="startStop" type="button">Старт</button>
+            <div id="status" class="status"></div>
+            <div id="uptime" class="uptime"></div>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="panel actions">
-      <button class="control" id="startStop" type="button">Старт</button>
-      <button class="control" id="copyLogs" type="button">Копировать логи</button>
-      <div id="status" class="status"></div>
-    </section>
-
     <section class="panel logs-panel">
-      <h2 id="logsTitle">Логи</h2>
+      <div class="logs-header">
+        <h2 id="logsTitle">Логи</h2>
+        <button class="control" id="copyLogs" type="button">Копировать логи</button>
+      </div>
       <div id="logs" class="control"></div>
     </section>
   </div>

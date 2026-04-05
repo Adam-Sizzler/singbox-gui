@@ -1,22 +1,26 @@
 (function () {
   var urlInput = document.getElementById("url");
   var versionInput = document.getElementById("version");
+  var autoUpdateInput = document.getElementById("autoUpdateHours");
   var profileWrap = document.getElementById("profileWrap");
   var profilePicker = document.getElementById("profilePicker");
   var profileValueNode = document.getElementById("profileValue");
   var profileMenu = document.getElementById("profileMenu");
   var newProfileBtn = document.getElementById("newProfile");
   var deleteProfileBtn = document.getElementById("deleteProfile");
+  var checkConfigBtn = document.getElementById("checkConfig");
   var startStopBtn = document.getElementById("startStop");
   var copyLogsBtn = document.getElementById("copyLogs");
   var statusNode = document.getElementById("status");
+  var uptimeNode = document.getElementById("uptime");
   var logsNode = document.getElementById("logs");
   var settingsTitleNode = document.getElementById("settingsTitle");
   var logsTitleNode = document.getElementById("logsTitle");
   var labelUrlNode = document.getElementById("labelUrl");
   var labelVersionNode = document.getElementById("labelVersion");
+  var labelAutoUpdateNode = document.getElementById("labelAutoUpdate");
   var labelProfileNode = document.getElementById("labelProfile");
-  var labelLanguageNode = document.getElementById("labelLanguage");
+  var labelRunCheckNode = document.getElementById("labelRunCheck");
   var langRuBtn = document.getElementById("langRu");
   var langEnBtn = document.getElementById("langEn");
 
@@ -33,15 +37,19 @@
   var lastRunning = false;
   var lastBusy = false;
   var lastProtoWarn = "";
+  var lastAutoUpdateHours = 12;
+  var lastUptimeSeconds = 0;
 
   var I18N = {
     ru: {
       settings: "Настройки",
       logs: "Логи",
-      configUrl: "Config URL:",
-      version: "Версия sing-box:",
+      configUrl: "Ссылка:",
+      version: "Версия ядра:",
+      autoUpdate: "Автообновление (часы):",
       profile: "Профиль:",
-      language: "Язык:",
+      runCheck: "Запуск/проверка:",
+      checkConfig: "Проверить",
       newProfile: "Новый",
       deleteProfile: "Удалить",
       start: "Старт",
@@ -50,6 +58,8 @@
       statusBusy: "Выполняется операция...",
       statusRunning: "sing-box запущен",
       statusStopped: "sing-box остановлен",
+      statusConfigOk: "Конфигурация валидна",
+      uptime: "Аптайм",
       statusLogsCopied: "Логи скопированы в буфер обмена",
       confirmDelete: "Удалить текущий профиль?",
       warnPrefix: "WARN: ",
@@ -59,9 +69,11 @@
       settings: "Settings",
       logs: "Logs",
       configUrl: "Config URL:",
-      version: "sing-box version:",
+      version: "Core version:",
+      autoUpdate: "Auto-update (hours):",
       profile: "Profile:",
-      language: "Language:",
+      runCheck: "Run/Check:",
+      checkConfig: "Check",
       newProfile: "New",
       deleteProfile: "Delete",
       start: "Start",
@@ -70,6 +82,8 @@
       statusBusy: "Operation in progress...",
       statusRunning: "sing-box is running",
       statusStopped: "sing-box is stopped",
+      statusConfigOk: "Configuration is valid",
+      uptime: "Uptime",
       statusLogsCopied: "Logs copied to clipboard",
       confirmDelete: "Delete current profile?",
       warnPrefix: "WARN: ",
@@ -124,6 +138,14 @@
     return "ru";
   }
 
+  function normalizeAutoUpdateHours(raw) {
+    var parsed = parseInt(String(raw == null ? "" : raw).trim(), 10);
+    if (isNaN(parsed) || parsed < 0) {
+      return 0;
+    }
+    return parsed;
+  }
+
   function tr(key) {
     var langDict = I18N[currentLanguage] || I18N.ru;
     if (Object.prototype.hasOwnProperty.call(langDict, key)) {
@@ -138,12 +160,15 @@
     if (logsTitleNode) logsTitleNode.textContent = tr("logs");
     if (labelUrlNode) labelUrlNode.textContent = tr("configUrl");
     if (labelVersionNode) labelVersionNode.textContent = tr("version");
+    if (labelAutoUpdateNode) labelAutoUpdateNode.textContent = tr("autoUpdate");
     if (labelProfileNode) labelProfileNode.textContent = tr("profile");
-    if (labelLanguageNode) labelLanguageNode.textContent = tr("language");
+    if (labelRunCheckNode) labelRunCheckNode.textContent = tr("runCheck");
+    if (checkConfigBtn) checkConfigBtn.textContent = tr("checkConfig");
     if (newProfileBtn) newProfileBtn.textContent = tr("newProfile");
     if (deleteProfileBtn) deleteProfileBtn.textContent = tr("deleteProfile");
     if (copyLogsBtn) copyLogsBtn.textContent = tr("copyLogs");
     if (startStopBtn) startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
+    renderUptime(lastUptimeSeconds, lastRunning);
 
     if (langRuBtn) {
       langRuBtn.className = currentLanguage === "ru" ? "control lang-btn active" : "control lang-btn";
@@ -163,6 +188,29 @@
       return;
     }
     setStatus(lastRunning ? tr("statusRunning") : tr("statusStopped"));
+  }
+
+  function formatUptime(seconds) {
+    var total = parseInt(seconds, 10);
+    if (isNaN(total) || total < 0) total = 0;
+    var h = Math.floor(total / 3600);
+    var m = Math.floor((total % 3600) / 60);
+    var s = total % 60;
+
+    function pad(v) {
+      return v < 10 ? "0" + String(v) : String(v);
+    }
+
+    if (h > 99) {
+      return String(h) + ":" + pad(m) + ":" + pad(s);
+    }
+    return pad(h) + ":" + pad(m) + ":" + pad(s);
+  }
+
+  function renderUptime(uptimeSeconds, running) {
+    if (!uptimeNode) return;
+    var shown = running ? formatUptime(uptimeSeconds) : "00:00:00";
+    uptimeNode.textContent = tr("uptime") + ": " + shown;
   }
 
   function setLanguage(next, persist) {
@@ -298,11 +346,18 @@
     if (document.activeElement !== versionInput) {
       versionInput.value = state.version || "latest";
     }
+    lastAutoUpdateHours = normalizeAutoUpdateHours(state.auto_update_hours);
+    if (document.activeElement !== autoUpdateInput) {
+      autoUpdateInput.value = String(lastAutoUpdateHours);
+    }
 
     lastRunning = !!state.running;
     lastBusy = !!state.busy;
+    lastUptimeSeconds = parseInt(state.uptime_seconds || 0, 10);
+    if (isNaN(lastUptimeSeconds) || lastUptimeSeconds < 0) lastUptimeSeconds = 0;
     startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
     startStopBtn.disabled = lastBusy;
+    if (checkConfigBtn) checkConfigBtn.disabled = lastBusy;
     applyLanguageUI();
     lastProtoWarn = state.proto_reg_warn || "";
     renderDefaultStatus(lastProtoWarn);
@@ -328,11 +383,19 @@
     }
     saveTimer = setTimeout(function () {
       saveTimer = null;
+      var autoUpdateHours = lastAutoUpdateHours;
+      if (autoUpdateInput) {
+        var rawHours = String(autoUpdateInput.value || "").trim();
+        if (rawHours !== "") {
+          autoUpdateHours = normalizeAutoUpdateHours(rawHours);
+        }
+      }
       api("POST", "/api/state", {
         current_profile: selectedProfile,
         language: currentLanguage,
         url: urlInput.value,
-        version: versionInput.value
+        version: versionInput.value,
+        auto_update_hours: autoUpdateHours
       }, function (err, state) {
         if (err) {
           setStatus(tr("errorPrefix") + err.message);
@@ -534,6 +597,11 @@
 
   urlInput.oninput = saveStateDebounced;
   versionInput.oninput = saveStateDebounced;
+  autoUpdateInput.oninput = saveStateDebounced;
+  autoUpdateInput.onblur = function () {
+    if (!autoUpdateInput) return;
+    autoUpdateInput.value = String(normalizeAutoUpdateHours(autoUpdateInput.value));
+  };
 
   newProfileBtn.onclick = function () {
     api("POST", "/api/profile/new", { name: "" }, function (err, state) {
@@ -578,6 +646,24 @@
       refreshState();
     });
   };
+
+  if (checkConfigBtn) {
+    checkConfigBtn.onclick = function () {
+      checkConfigBtn.disabled = true;
+      api("POST", "/api/action/check-config", {}, function (err, state) {
+        if (err) {
+          setStatus(tr("errorPrefix") + err.message);
+          refreshState();
+          return;
+        }
+        renderState(state);
+        setStatus(tr("statusConfigOk"));
+        setTimeout(function () {
+          renderDefaultStatus(lastProtoWarn);
+        }, 1500);
+      });
+    };
+  }
 
   copyLogsBtn.onclick = function () {
     api("POST", "/api/action/copy-logs", {}, function (err) {

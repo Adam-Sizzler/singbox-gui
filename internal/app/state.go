@@ -59,6 +59,8 @@ type App struct {
 	proc              *exec.Cmd
 	procStopRequested bool
 	procWaitDone      chan struct{}
+	procStartedAt     time.Time
+	runtimeCfgMu      sync.Mutex
 
 	runMu         sync.Mutex
 	runningAction bool
@@ -77,6 +79,10 @@ type App struct {
 	mw  *walk.MainWindow
 	web *walk.WebView
 
+	autoUpdateMu   sync.Mutex
+	autoUpdateStop chan struct{}
+	autoUpdateWake chan struct{}
+
 	themeWatchStop chan struct{}
 	systemDark     bool
 }
@@ -87,14 +93,16 @@ type logEntry struct {
 }
 
 type AppState struct {
-	CurrentProfile string          `json:"current_profile"`
-	Profiles       []ConfigProfile `json:"profiles"`
-	Language       string          `json:"language"`
-	URL            string          `json:"url"`
-	Version        string          `json:"version"`
-	Running        bool            `json:"running"`
-	Busy           bool            `json:"busy"`
-	ProtoRegWarn   string          `json:"proto_reg_warn,omitempty"`
+	CurrentProfile  string          `json:"current_profile"`
+	Profiles        []ConfigProfile `json:"profiles"`
+	Language        string          `json:"language"`
+	URL             string          `json:"url"`
+	Version         string          `json:"version"`
+	AutoUpdateHours int             `json:"auto_update_hours"`
+	UptimeSeconds   int64           `json:"uptime_seconds"`
+	Running         bool            `json:"running"`
+	Busy            bool            `json:"busy"`
+	ProtoRegWarn    string          `json:"proto_reg_warn,omitempty"`
 }
 
 func (a *App) setConfig(cfg AppConfig) {
@@ -118,6 +126,7 @@ func (a *App) persistConfig(cfg AppConfig) error {
 		return err
 	}
 	a.setConfig(cfg)
+	a.triggerAutoUpdateReconfigure()
 	return nil
 }
 
@@ -130,22 +139,25 @@ func (a *App) snapshotState() AppState {
 	a.runMu.Unlock()
 
 	return AppState{
-		CurrentProfile: cfg.CurrentProfile,
-		Profiles:       append([]ConfigProfile(nil), cfg.Profiles...),
-		Language:       cfg.Language,
-		URL:            active.URL,
-		Version:        active.Version,
-		Running:        a.isProcessRunning(),
-		Busy:           busy,
-		ProtoRegWarn:   a.protoRegWarn,
+		CurrentProfile:  cfg.CurrentProfile,
+		Profiles:        append([]ConfigProfile(nil), cfg.Profiles...),
+		Language:        cfg.Language,
+		URL:             active.URL,
+		Version:         active.Version,
+		AutoUpdateHours: cfg.AutoUpdateHours,
+		UptimeSeconds:   a.processUptimeSeconds(),
+		Running:         a.isProcessRunning(),
+		Busy:            busy,
+		ProtoRegWarn:    a.protoRegWarn,
 	}
 }
 
 type StatePatch struct {
-	CurrentProfile *string `json:"current_profile"`
-	Language       *string `json:"language"`
-	URL            *string `json:"url"`
-	Version        *string `json:"version"`
+	CurrentProfile  *string `json:"current_profile"`
+	Language        *string `json:"language"`
+	URL             *string `json:"url"`
+	Version         *string `json:"version"`
+	AutoUpdateHours *int    `json:"auto_update_hours"`
 }
 
 func (a *App) applyStatePatch(p StatePatch) error {
@@ -165,6 +177,9 @@ func (a *App) applyStatePatch(p StatePatch) error {
 
 	if p.Language != nil {
 		cfg.Language = normalizeAppLanguage(*p.Language)
+	}
+	if p.AutoUpdateHours != nil {
+		cfg.AutoUpdateHours = normalizeAutoUpdateHours(*p.AutoUpdateHours)
 	}
 
 	idx := activeProfileIndex(&cfg)

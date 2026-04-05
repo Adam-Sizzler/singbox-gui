@@ -4,6 +4,13 @@ on:
   push:
     tags:
       - "*"
+  release:
+    types:
+      - published
+      - edited
+
+permissions:
+  contents: write
 
 jobs:
   build-windows:
@@ -24,9 +31,28 @@ jobs:
           chmod +x build-windows.sh
           ./build-windows.sh
 
+      - name: Resolve tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "value=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: singbox-gui-windows-${{ github.ref_name }}
+          name: singbox-gui-windows-${{ steps.tag.outputs.value }}
           path: singbox-gui.exe
           if-no-files-found: error
+
+      - name: Attach binary to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.value }}
+          files: singbox-gui.exe
+          overwrite_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -12,7 +12,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const defaultAppLanguage = "ru"
+const (
+	defaultAppLanguage   = "ru"
+	defaultAutoUpdateHrs = 12
+	maxAutoUpdateHours   = 24 * 365
+)
 
 type AppConfig struct {
 	// Legacy flat fields (kept for backward compatibility).
@@ -20,24 +24,27 @@ type AppConfig struct {
 	Version     string `yaml:"version,omitempty"`
 	ProfileName string `yaml:"profile_name,omitempty"`
 
-	Language       string          `yaml:"language,omitempty"`
-	CurrentProfile string          `yaml:"current_profile,omitempty"`
-	Profiles       []ConfigProfile `yaml:"profiles,omitempty"`
+	AutoUpdateHours int             `yaml:"auto_update_hours,omitempty"`
+	Language        string          `yaml:"language,omitempty"`
+	CurrentProfile  string          `yaml:"current_profile,omitempty"`
+	Profiles        []ConfigProfile `yaml:"profiles,omitempty"`
 }
 
 type appConfigPersist struct {
-	Language       string          `yaml:"language"`
-	CurrentProfile string          `yaml:"current_profile"`
-	Profiles       []ConfigProfile `yaml:"profiles"`
+	AutoUpdateHours int             `yaml:"auto_update_hours"`
+	Language        string          `yaml:"language"`
+	CurrentProfile  string          `yaml:"current_profile"`
+	Profiles        []ConfigProfile `yaml:"profiles"`
 }
 
 func (c AppConfig) MarshalYAML() (interface{}, error) {
 	cfg := c
 	normalizeConfigProfiles(&cfg)
 	return appConfigPersist{
-		Language:       cfg.Language,
-		CurrentProfile: cfg.CurrentProfile,
-		Profiles:       cfg.Profiles,
+		AutoUpdateHours: cfg.AutoUpdateHours,
+		Language:        cfg.Language,
+		CurrentProfile:  cfg.CurrentProfile,
+		Profiles:        cfg.Profiles,
 	}, nil
 }
 
@@ -65,6 +72,15 @@ func loadOrCreateConfig(path string) (AppConfig, error) {
 	if err := yaml.Unmarshal(b, &cfg); err != nil {
 		return AppConfig{}, err
 	}
+	var detect struct {
+		AutoUpdateHours *int `yaml:"auto_update_hours"`
+	}
+	if err := yaml.Unmarshal(b, &detect); err != nil {
+		return AppConfig{}, err
+	}
+	if detect.AutoUpdateHours == nil {
+		cfg.AutoUpdateHours = defaultAutoUpdateHrs
+	}
 	normalizeConfigProfiles(&cfg)
 	return cfg, nil
 }
@@ -91,8 +107,9 @@ func validateConfig(cfg AppConfig) error {
 
 func defaultAppConfig() AppConfig {
 	cfg := AppConfig{
-		Language:       defaultAppLanguage,
-		CurrentProfile: "default",
+		AutoUpdateHours: defaultAutoUpdateHrs,
+		Language:        defaultAppLanguage,
+		CurrentProfile:  "default",
 		Profiles: []ConfigProfile{
 			{
 				Name:    "default",
@@ -109,6 +126,7 @@ func normalizeConfigProfiles(cfg *AppConfig) {
 	if cfg == nil {
 		return
 	}
+	cfg.AutoUpdateHours = normalizeAutoUpdateHours(cfg.AutoUpdateHours)
 	cfg.Language = normalizeAppLanguage(cfg.Language)
 
 	if len(cfg.Profiles) == 0 {
@@ -167,6 +185,16 @@ func normalizeConfigProfiles(cfg *AppConfig) {
 	}
 	cfg.CurrentProfile = cfg.Profiles[idx].Name
 	syncLegacyFromCurrent(cfg)
+}
+
+func normalizeAutoUpdateHours(raw int) int {
+	if raw < 0 {
+		return 0
+	}
+	if raw > maxAutoUpdateHours {
+		return maxAutoUpdateHours
+	}
+	return raw
 }
 
 func syncLegacyFromCurrent(cfg *AppConfig) {

@@ -15,6 +15,11 @@ Russian version: `README.ru.md`
 - ANSI-aware colored log rendering in UI
 - Multiple profiles (`create`, `select`, `delete`)
 - RU/EN localization with language switch in UI
+- Automatic runtime config refresh from URL:
+  - default interval: 12 hours
+  - `0` means disabled
+  - downloaded file is validated before replacing current `config.json`
+  - no automatic core restart on background refresh
 - `sing-box://import-remote-profile?...` protocol support
 - Single-instance import behavior:
   - if app is already running, import is sent to existing window
@@ -64,6 +69,7 @@ Current config format:
 
 ```yaml
 language: ru
+auto_update_hours: 12
 current_profile: default
 profiles:
   - name: default
@@ -87,6 +93,16 @@ Behavior:
   - switch current profile to it
 - if profile name is absent: apply URL to current profile
 - no auto-start after import
+
+## Auto Update
+
+`auto_update_hours` controls background refresh of `config.json` for the active profile URL:
+
+- `12` by default
+- `0` disables auto update
+- any positive value means interval in hours
+
+The app only replaces `config.json` if the downloaded content is valid JSON.
 
 ## GitHub Actions
 

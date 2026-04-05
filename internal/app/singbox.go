@@ -100,11 +100,35 @@ func downloadAndInstallSingBox(version, targetExe string) error {
 	return nil
 }
 
-func downloadRuntimeConfig(url, target string) error {
-	if err := downloadFile(url, target, map[string]string{"User-Agent": userAgent}); err != nil {
-		return fmt.Errorf("не удалось скачать config.json: %w", err)
+func downloadRuntimeConfig(url, target string) (bool, error) {
+	tmpPath := target + ".download.tmp"
+	if err := downloadFile(url, tmpPath, map[string]string{"User-Agent": userAgent}); err != nil {
+		return false, fmt.Errorf("не удалось скачать config.json: %w", err)
 	}
-	return validateRuntimeConfigFile(target)
+	defer os.Remove(tmpPath)
+
+	if err := validateRuntimeConfigFile(tmpPath); err != nil {
+		return false, fmt.Errorf("полученный config.json не является валидным JSON: %w", err)
+	}
+
+	newContent, err := os.ReadFile(tmpPath)
+	if err != nil {
+		return false, err
+	}
+
+	oldContent, err := os.ReadFile(target)
+	if err == nil {
+		if bytes.Equal(bytes.TrimSpace(oldContent), bytes.TrimSpace(newContent)) {
+			return false, nil
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false, err
+	}
+
+	if err := os.Rename(tmpPath, target); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func ensureLocalRuntimeConfig(target string) error {
@@ -118,6 +142,15 @@ func ensureLocalRuntimeConfig(target string) error {
 		return fmt.Errorf("локальный config.json не является валидным JSON: %w", err)
 	}
 	return nil
+}
+
+func validateRemoteRuntimeConfig(url string) error {
+	tmpPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-gui-config-check-%d.json", time.Now().UnixNano()))
+	if err := downloadFile(url, tmpPath, map[string]string{"User-Agent": userAgent}); err != nil {
+		return fmt.Errorf("не удалось скачать config.json: %w", err)
+	}
+	defer os.Remove(tmpPath)
+	return validateRuntimeConfigFile(tmpPath)
 }
 
 func validateRuntimeConfigFile(path string) error {
