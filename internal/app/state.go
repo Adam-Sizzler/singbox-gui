@@ -78,6 +78,7 @@ type App struct {
 
 	mw  *walk.MainWindow
 	web *walk.WebView
+	ni  *walk.NotifyIcon
 
 	autoUpdateMu   sync.Mutex
 	autoUpdateStop chan struct{}
@@ -92,7 +93,11 @@ type App struct {
 	appLatestReleaseURL  string
 
 	themeWatchStop chan struct{}
+	powerWatchStop chan struct{}
 	systemDark     bool
+
+	coreDesiredMu      sync.Mutex
+	coreDesiredRunning bool
 }
 
 type logEntry struct {
@@ -107,6 +112,9 @@ type AppState struct {
 	URL                 string          `json:"url"`
 	Version             string          `json:"version"`
 	AutoUpdateHours     int             `json:"auto_update_hours"`
+	AutoStartCore       bool            `json:"auto_start_core"`
+	StartMinimizedTray  bool            `json:"start_minimized_to_tray"`
+	UIScale             float64         `json:"ui_scale"`
 	UptimeSeconds       int64           `json:"uptime_seconds"`
 	Running             bool            `json:"running"`
 	Busy                bool            `json:"busy"`
@@ -160,6 +168,9 @@ func (a *App) snapshotState() AppState {
 		URL:                 active.URL,
 		Version:             active.Version,
 		AutoUpdateHours:     cfg.AutoUpdateHours,
+		AutoStartCore:       cfg.AutoStartCore,
+		StartMinimizedTray:  cfg.StartMinimizedToTray,
+		UIScale:             systemUIScale(),
 		UptimeSeconds:       a.processUptimeSeconds(),
 		Running:             a.isProcessRunning(),
 		Busy:                busy,
@@ -173,11 +184,13 @@ func (a *App) snapshotState() AppState {
 }
 
 type StatePatch struct {
-	CurrentProfile  *string `json:"current_profile"`
-	Language        *string `json:"language"`
-	URL             *string `json:"url"`
-	Version         *string `json:"version"`
-	AutoUpdateHours *int    `json:"auto_update_hours"`
+	CurrentProfile       *string `json:"current_profile"`
+	Language             *string `json:"language"`
+	URL                  *string `json:"url"`
+	Version              *string `json:"version"`
+	AutoUpdateHours      *int    `json:"auto_update_hours"`
+	AutoStartCore        *bool   `json:"auto_start_core"`
+	StartMinimizedToTray *bool   `json:"start_minimized_to_tray"`
 }
 
 func (a *App) applyStatePatch(p StatePatch) error {
@@ -200,6 +213,12 @@ func (a *App) applyStatePatch(p StatePatch) error {
 	}
 	if p.AutoUpdateHours != nil {
 		cfg.AutoUpdateHours = normalizeAutoUpdateHours(*p.AutoUpdateHours)
+	}
+	if p.AutoStartCore != nil {
+		cfg.AutoStartCore = *p.AutoStartCore
+	}
+	if p.StartMinimizedToTray != nil {
+		cfg.StartMinimizedToTray = *p.StartMinimizedToTray
 	}
 
 	idx := activeProfileIndex(&cfg)

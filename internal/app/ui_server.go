@@ -49,6 +49,7 @@ func (a *App) startUIServer() error {
 	mux.HandleFunc("/api/action/check-config", a.handleAPICheckConfig)
 	mux.HandleFunc("/api/action/start-stop", a.handleAPIStartStop)
 	mux.HandleFunc("/api/action/copy-logs", a.handleAPICopyLogs)
+	mux.HandleFunc("/api/action/update-app", a.handleAPIUpdateApp)
 	mux.HandleFunc("/api/logs", a.handleAPILogs)
 
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -189,6 +190,18 @@ func (a *App) handleAPICopyLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.copyLogsToClipboard(); err != nil {
+		writeJSON(w, http.StatusBadRequest, apiError{Error: err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (a *App) handleAPIUpdateApp(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if err := a.updateApplicationAction(); err != nil {
 		writeJSON(w, http.StatusBadRequest, apiError{Error: err.Error()})
 		return
 	}

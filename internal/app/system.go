@@ -14,6 +14,73 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+func hideConsoleWindow() {
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	getConsoleWindow := kernel32.NewProc("GetConsoleWindow")
+	user32 := syscall.NewLazyDLL("user32.dll")
+	showWindow := user32.NewProc("ShowWindow")
+
+	const swHide = 0
+	hwnd, _, _ := getConsoleWindow.Call()
+	if hwnd == 0 {
+		return
+	}
+	_, _, _ = showWindow.Call(hwnd, uintptr(swHide))
+}
+
+func systemUIScale() float64 {
+	dpi := systemDPI()
+	if dpi < 96 {
+		dpi = 96
+	}
+	scale := float64(dpi) / 96.0
+	if scale < 1.0 {
+		return 1.0
+	}
+	if scale > 3.0 {
+		return 3.0
+	}
+	return scale
+}
+
+func systemDPI() int {
+	user32 := syscall.NewLazyDLL("user32.dll")
+	getDpiForSystem := user32.NewProc("GetDpiForSystem")
+	if err := user32.Load(); err == nil {
+		if err := getDpiForSystem.Find(); err == nil {
+			if dpi, _, _ := getDpiForSystem.Call(); dpi >= 96 && dpi <= 960 {
+				return int(dpi)
+			}
+		}
+	}
+
+	getDC := user32.NewProc("GetDC")
+	releaseDC := user32.NewProc("ReleaseDC")
+	gdi32 := syscall.NewLazyDLL("gdi32.dll")
+	getDeviceCaps := gdi32.NewProc("GetDeviceCaps")
+	if err := user32.Load(); err == nil {
+		if err := gdi32.Load(); err == nil {
+			if err := getDC.Find(); err == nil {
+				if err := releaseDC.Find(); err == nil {
+					if err := getDeviceCaps.Find(); err == nil {
+						hdc, _, _ := getDC.Call(0)
+						if hdc != 0 {
+							const logPixelsX = 88
+							dpi, _, _ := getDeviceCaps.Call(hdc, uintptr(logPixelsX))
+							_, _, _ = releaseDC.Call(0, hdc)
+							if dpi >= 96 && dpi <= 960 {
+								return int(dpi)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return 96
+}
+
 func executableDir() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {

@@ -9,11 +9,28 @@
 </head>
 <body>
   <div class="app">
-    <section class="panel">
+    <section class="panel settings-panel">
       <div class="panel-header">
         <h1 id="settingsTitle">Настройки</h1>
         <div class="lang-switch">
-          <a id="releaseTagLink" class="release-tag-link" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+          <div id="releaseMenuWrap" class="release-menu-wrap">
+            <button class="control release-menu-toggle" id="releaseMenuToggle" type="button" aria-haspopup="menu" aria-expanded="false">
+              <span id="releaseUpdateBadge" class="release-update-badge" hidden></span>
+              <span id="releaseMenuLabel" class="release-menu-label">Release</span>
+              <span class="release-menu-arrow" aria-hidden="true"></span>
+            </button>
+            <div id="releaseMenu" class="release-menu" role="menu" hidden>
+              <div class="release-menu-item release-menu-item-info" role="none">
+                <span id="releaseCurrentCaption" class="release-menu-caption">Текущий релиз</span>
+                <a id="releaseCurrentLink" class="release-menu-value release-menu-link" href="#" target="_blank" rel="noopener noreferrer" role="menuitem">-</a>
+              </div>
+              <div id="releaseLatestRow" class="release-menu-item release-menu-item-info" role="none">
+                <span id="releaseLatestCaption" class="release-menu-caption">Последний релиз</span>
+                <a id="releaseLatestLink" class="release-menu-value release-menu-link" href="#" target="_blank" rel="noopener noreferrer" role="menuitem">-</a>
+              </div>
+              <button id="updateAppBtn" class="release-menu-item release-menu-action" type="button" role="menuitem">Обновить приложение</button>
+            </div>
+          </div>
           <button class="control lang-btn" id="langRu" type="button">RU</button>
           <button class="control lang-btn" id="langEn" type="button">EN</button>
         </div>
@@ -64,6 +81,22 @@
       </div>
 
       <div class="field-row">
+        <label class="field-label" id="labelStartupOptions">Запуск:</label>
+        <div class="field-control">
+          <div class="startup-options">
+            <label class="startup-option" for="autoStartCore">
+              <input id="autoStartCore" type="checkbox">
+              <span id="labelAutoStartCore">Автозапуск ядра при старте приложения</span>
+            </label>
+            <label class="startup-option" for="startMinimizedTray">
+              <input id="startMinimizedTray" type="checkbox">
+              <span id="labelStartMinimizedTray">Запускать приложение свернутым в трей</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-row">
         <label class="field-label" id="labelRunCheck" for="checkConfig">Запуск/проверка:</label>
         <div class="field-control">
           <div class="run-controls">
@@ -81,6 +114,7 @@
           </div>
         </div>
       </div>
+
     </section>
 
     <section class="panel logs-panel">

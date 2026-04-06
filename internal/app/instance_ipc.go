@@ -145,9 +145,6 @@ func (a *App) focusMainWindow() {
 
 func notifyRunningInstance(importURI string) bool {
 	trimmed := strings.TrimSpace(importURI)
-	if trimmed == "" {
-		return false
-	}
 
 	client := &http.Client{Timeout: 600 * time.Millisecond}
 	if !instanceServerAlive(client) {

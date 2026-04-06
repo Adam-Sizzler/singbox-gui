@@ -29,30 +29,36 @@ type AppConfig struct {
 	Version     string `yaml:"version,omitempty"`
 	ProfileName string `yaml:"profile_name,omitempty"`
 
-	AutoUpdateHours int               `yaml:"auto_update_hours,omitempty"`
-	Language        string            `yaml:"language,omitempty"`
-	CurrentProfile  string            `yaml:"current_profile,omitempty"`
-	Profiles        []ConfigProfile   `yaml:"profiles,omitempty"`
-	SingboxEnv      map[string]string `yaml:"singbox-env,omitempty"`
+	AutoUpdateHours      int               `yaml:"auto_update_hours,omitempty"`
+	AutoStartCore        bool              `yaml:"auto_start_core,omitempty"`
+	StartMinimizedToTray bool              `yaml:"start_minimized_to_tray,omitempty"`
+	Language             string            `yaml:"language,omitempty"`
+	CurrentProfile       string            `yaml:"current_profile,omitempty"`
+	Profiles             []ConfigProfile   `yaml:"profiles,omitempty"`
+	SingboxEnv           map[string]string `yaml:"singbox-env,omitempty"`
 }
 
 type appConfigPersist struct {
-	AutoUpdateHours int               `yaml:"auto_update_hours"`
-	Language        string            `yaml:"language"`
-	CurrentProfile  string            `yaml:"current_profile"`
-	Profiles        []ConfigProfile   `yaml:"profiles"`
-	SingboxEnv      map[string]string `yaml:"singbox-env,omitempty"`
+	AutoUpdateHours      int               `yaml:"auto_update_hours"`
+	AutoStartCore        bool              `yaml:"auto_start_core"`
+	StartMinimizedToTray bool              `yaml:"start_minimized_to_tray"`
+	Language             string            `yaml:"language"`
+	CurrentProfile       string            `yaml:"current_profile"`
+	Profiles             []ConfigProfile   `yaml:"profiles"`
+	SingboxEnv           map[string]string `yaml:"singbox-env,omitempty"`
 }
 
 func (c AppConfig) MarshalYAML() (interface{}, error) {
 	cfg := c
 	normalizeConfigProfiles(&cfg)
 	return appConfigPersist{
-		AutoUpdateHours: cfg.AutoUpdateHours,
-		Language:        cfg.Language,
-		CurrentProfile:  cfg.CurrentProfile,
-		Profiles:        cfg.Profiles,
-		SingboxEnv:      cfg.SingboxEnv,
+		AutoUpdateHours:      cfg.AutoUpdateHours,
+		AutoStartCore:        cfg.AutoStartCore,
+		StartMinimizedToTray: cfg.StartMinimizedToTray,
+		Language:             cfg.Language,
+		CurrentProfile:       cfg.CurrentProfile,
+		Profiles:             cfg.Profiles,
+		SingboxEnv:           cfg.SingboxEnv,
 	}, nil
 }
 

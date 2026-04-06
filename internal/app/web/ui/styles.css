@@ -1,7 +1,36 @@
+:root {
+  --ui-scale: 1;
+  --ui-font-size: 15px;
+  --ui-title-font-size: 23px;
+  --ui-control-height: 32px;
+  --ui-control-radius: 8px;
+  --ui-control-pad-x: 10px;
+  --ui-modal-title-font-size: 20px;
+  --ui-caption-font-size: 12px;
+  --ui-action-font-size: 14px;
+  --ui-label-width: 138px;
+  --ui-control-min-width: 104px;
+  --ui-copy-min-width: 132px;
+  --ui-space-xxs: 2px;
+  --ui-space-xs: 4px;
+  --ui-space-sm: 6px;
+  --ui-space-md: 8px;
+  --ui-space-lg: 10px;
+  --ui-space-xl: 12px;
+  --ui-profile-menu-max-height: 220px;
+  --ui-release-menu-width: 250px;
+  --ui-release-toggle-min-width: 130px;
+  --ui-lang-btn-width: 58px;
+  --ui-uptime-min-width: 120px;
+  --ui-toast-width: 320px;
+  --ui-modal-width: 460px;
+  --ui-checkbox-size: 16px;
+}
+
 html,
 body {
   width: 100%;
-  min-height: 100vh;
+  min-height: 0;
   height: 100%;
   margin: 0;
   padding: 0;
@@ -30,8 +59,7 @@ body {
 
 .app {
   width: 100%;
-  height: 100vh;
-  height: 100dvh;
+  height: 100%;
   padding: 10px;
   overflow: hidden;
   display: -ms-flexbox;
@@ -50,6 +78,14 @@ body {
   -ms-flex: 0 0 auto;
   flex: 0 0 auto;
   min-width: 0;
+}
+
+.settings-panel {
+  -ms-flex: 0 1 auto;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .panel h1,
@@ -384,39 +420,135 @@ input.control::-ms-clear {
   white-space: nowrap;
 }
 
-.release-tag-link {
-  display: inline-block;
-  height: 32px;
-  line-height: 32px;
-  border-radius: 8px;
-  padding: 0 10px;
+.release-menu-wrap {
+  position: relative;
   margin-right: 8px;
-  background: #1f1f1f;
-  color: #d9d9d9;
+}
+
+.release-menu-toggle {
+  position: relative;
+  min-width: 130px;
+  text-align: left;
+  padding: 0 30px 0 12px;
+}
+
+.release-menu-label {
+  display: block;
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.release-menu-arrow {
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 6px solid rgba(243, 243, 243, 0.85);
+  margin-top: -2px;
+  transition: transform 0.12s ease;
+}
+
+.release-menu-toggle.open .release-menu-arrow {
+  transform: rotate(180deg);
+  margin-top: -4px;
+}
+
+.release-update-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #efbf04;
+  box-shadow: 0 0 6px rgba(239, 191, 4, 0.6);
+  pointer-events: none;
+}
+
+.release-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 75;
+  width: 250px;
+  border-radius: 10px;
+  background: #1b1b1b;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 6px;
+}
+
+.release-menu[hidden] {
+  display: none;
+}
+
+.release-menu-item {
+  width: 100%;
+  border: none;
+  outline: none;
+  border-radius: 8px;
+}
+
+.release-menu-item-info {
+  background: #222;
+  padding: 7px 9px;
+}
+
+.release-menu-item-info + .release-menu-item-info {
+  margin-top: 6px;
+}
+
+.release-menu-caption {
+  display: block;
+  font-size: 12px;
+  line-height: 1.25;
+  color: #a8a8a8;
+}
+
+.release-menu-value {
+  display: block;
+  margin-top: 2px;
+  line-height: 1.25;
+  color: #f3f3f3;
   text-decoration: none;
 }
 
-.release-tag-link:hover {
-  background: #272727;
+.release-menu-link:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.release-menu-action {
+  display: block;
+  margin-top: 6px;
+  padding: 0 10px;
+  height: 32px;
+  line-height: 32px;
+  text-align: left;
+  cursor: pointer;
+  background: #1f1f1f;
   color: #f3f3f3;
+  font-family: "Segoe UI", sans-serif;
+  font-size: 14px;
+  transition: background-color 0.12s ease;
 }
 
-.release-tag-link:active {
-  background: #171717;
+.release-menu-action:hover {
+  background: #2a2a2a;
 }
 
-.release-tag-link.has-update {
-  background: #274a2f;
-  color: #c7f4d2;
+.release-menu-action:active {
+  background: #181818;
 }
 
-.release-tag-link.has-update:hover {
-  background: #2f5a39;
-  color: #e4ffea;
-}
-
-.release-tag-link.has-update:active {
-  background: #23442c;
+.release-menu-action:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .lang-btn {
@@ -556,7 +688,7 @@ input.control::-ms-clear {
   width: 100%;
   -ms-flex: 1 1 auto;
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   -ms-overflow-style: scrollbar;
@@ -743,6 +875,33 @@ button.control.danger:active {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
+.startup-options {
+  display: block;
+}
+
+.startup-option {
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.35;
+  cursor: pointer;
+  user-select: none;
+}
+
+.startup-option + .startup-option {
+  margin-top: 6px;
+}
+
+.startup-option input[type="checkbox"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  -ms-flex: 0 0 auto;
+  flex: 0 0 auto;
+}
+
 .toast.visible {
   opacity: 1;
   transform: translateY(0);
@@ -801,6 +960,11 @@ body::-webkit-scrollbar-thumb:hover,
 }
 
 @media (max-width: 560px) {
+  .release-menu {
+    width: min(250px, calc(100vw - 20px));
+    right: 0;
+  }
+
   .field-row {
     display: block;
   }
@@ -871,10 +1035,6 @@ body::-webkit-scrollbar-thumb:hover,
   }
 
   #checkConfig {
-    display: none;
-  }
-
-  #copyLogs {
     display: none;
   }
 

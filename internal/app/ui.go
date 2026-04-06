@@ -39,6 +39,8 @@ type windowCompositionAttribData struct {
 func (a *App) runUI() error {
 	a.systemDark = detectSystemDarkTheme()
 	setPreferredAppTheme(a.systemDark)
+	startupCfg := a.getConfigSnapshot()
+	startMinimizedToTray := startupCfg.StartMinimizedToTray && strings.TrimSpace(a.startupImport) == ""
 
 	if err := a.startUIServer(); err != nil {
 		return err
@@ -51,13 +53,17 @@ func (a *App) runUI() error {
 	}()
 
 	uiURL := a.uiBaseURL + "/?ts=" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	uiShown := false
-	showMainWindow := func() {
-		if uiShown || a.mw == nil {
+	uiInitialized := false
+	showMainWindow := func(force bool) {
+		if uiInitialized || a.mw == nil {
 			return
 		}
-		uiShown = true
+		uiInitialized = true
 		a.applyNativeDarkHints(a.systemDark)
+		if startMinimizedToTray && !force {
+			a.mw.Hide()
+			return
+		}
 		a.mw.Show()
 		a.mw.BringToTop()
 	}
@@ -77,10 +83,10 @@ func (a *App) runUI() error {
 				AssignTo:      &a.web,
 				StretchFactor: 1,
 				OnDocumentCompleted: func(string) {
-					showMainWindow()
+					showMainWindow(false)
 				},
 				OnNavigatedError: func(*walk.WebViewNavigatedErrorEventData) {
-					showMainWindow()
+					showMainWindow(false)
 				},
 				OnNavigating: func(eventData *walk.WebViewNavigatingEventData) {
 					if eventData == nil {
@@ -110,6 +116,10 @@ func (a *App) runUI() error {
 	}
 	created = true
 	a.applyMainWindowIcon()
+	if err := a.initNotifyIcon(); err != nil {
+		a.log("WARN: не удалось инициализировать иконку трея: %v", err)
+		startMinimizedToTray = false
+	}
 
 	if a.web != nil {
 		a.web.SetShortcutsEnabled(true)
@@ -120,10 +130,10 @@ func (a *App) runUI() error {
 	if a.web != nil {
 		if err := a.web.SetURL(uiURL); err != nil {
 			a.log("WARN: не удалось открыть UI страницу: %v", err)
-			showMainWindow()
+			showMainWindow(false)
 		}
 	} else {
-		showMainWindow()
+		showMainWindow(false)
 	}
 
 	if a.protoRegWarn != "" {
@@ -135,6 +145,8 @@ func (a *App) runUI() error {
 
 	a.startAutoUpdateScheduler()
 	a.startSystemThemeWatcher()
+	a.startPowerResumeWatcher()
+	a.startCoreOnStartupIfEnabled()
 	go func() {
 		for i := 0; i < 4; i++ {
 			time.Sleep(250 * time.Millisecond)
@@ -148,10 +160,13 @@ func (a *App) runUI() error {
 	}()
 
 	a.mw.Closing().Attach(func(canceled *bool, reason walk.CloseReason) {
+		a.setCoreDesiredRunning(false)
 		a.stopAutoUpdateScheduler()
 		a.stopSystemThemeWatcher()
+		a.stopPowerResumeWatcher()
 		a.stopUIServer()
 		a.stopProcess()
+		a.disposeNotifyIcon()
 	})
 
 	a.mw.Run()
@@ -342,6 +357,102 @@ func allowDarkModeForWindow(hwnd win.HWND, dark bool) {
 		enabled = 1
 	}
 	_, _, _ = procAllowDarkModeWindow.Call(uintptr(hwnd), enabled)
+}
+
+func (a *App) initNotifyIcon() error {
+	if a.mw == nil {
+		return nil
+	}
+	if a.ni != nil {
+		return nil
+	}
+
+	ni, err := walk.NewNotifyIcon(a.mw)
+	if err != nil {
+		return err
+	}
+	if icon := a.loadMainWindowIcon(); icon != nil {
+		_ = ni.SetIcon(icon)
+	}
+	_ = ni.SetToolTip("Sing-box GUI")
+	if err := ni.SetVisible(true); err != nil {
+		_ = ni.Dispose()
+		return err
+	}
+
+	showAction := walk.NewAction()
+	_ = showAction.SetText("Открыть")
+	showAction.Triggered().Attach(func() {
+		a.showMainWindowFromTray()
+	})
+
+	exitAction := walk.NewAction()
+	_ = exitAction.SetText("Выход")
+	exitAction.Triggered().Attach(func() {
+		if a.mw != nil {
+			_ = a.mw.Close()
+		}
+	})
+
+	_ = ni.ContextMenu().Actions().Add(showAction)
+	_ = ni.ContextMenu().Actions().Add(exitAction)
+
+	ni.MouseUp().Attach(func(x, y int, button walk.MouseButton) {
+		if button != walk.LeftButton {
+			return
+		}
+		a.toggleMainWindowVisibilityFromTray()
+	})
+
+	a.ni = ni
+	return nil
+}
+
+func (a *App) disposeNotifyIcon() {
+	if a.ni == nil {
+		return
+	}
+	_ = a.ni.Dispose()
+	a.ni = nil
+}
+
+func (a *App) showMainWindowFromTray() {
+	if a.mw == nil {
+		return
+	}
+	a.mw.Show()
+	a.mw.BringToTop()
+}
+
+func (a *App) toggleMainWindowVisibilityFromTray() {
+	if a.mw == nil {
+		return
+	}
+	if a.mw.Visible() {
+		a.mw.Hide()
+		return
+	}
+	a.showMainWindowFromTray()
+}
+
+func (a *App) startCoreOnStartupIfEnabled() {
+	cfg := a.getConfigSnapshot()
+	if !cfg.AutoStartCore {
+		return
+	}
+	a.setCoreDesiredRunning(true)
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		if err := a.withRunningAction(func() error {
+			if a.isProcessRunning() {
+				return nil
+			}
+			return a.startPipeline()
+		}); err != nil {
+			a.setCoreDesiredRunning(false)
+			a.log("WARN: автозапуск ядра не выполнен: %v", err)
+		}
+	}()
 }
 
 func detectSystemDarkTheme() bool {

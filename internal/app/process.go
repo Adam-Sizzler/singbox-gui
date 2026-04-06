@@ -27,6 +27,18 @@ func (a *App) isProcessRunning() bool {
 	return a.proc != nil && a.proc.Process != nil
 }
 
+func (a *App) setCoreDesiredRunning(v bool) {
+	a.coreDesiredMu.Lock()
+	a.coreDesiredRunning = v
+	a.coreDesiredMu.Unlock()
+}
+
+func (a *App) coreDesiredRunningSnapshot() bool {
+	a.coreDesiredMu.Lock()
+	defer a.coreDesiredMu.Unlock()
+	return a.coreDesiredRunning
+}
+
 func (a *App) processUptimeSeconds() int64 {
 	a.procMu.Lock()
 	defer a.procMu.Unlock()
@@ -43,10 +55,16 @@ func (a *App) processUptimeSeconds() int64 {
 func (a *App) toggleStartStop() error {
 	return a.withRunningAction(func() error {
 		if a.isProcessRunning() {
+			a.setCoreDesiredRunning(false)
 			a.stopProcess()
 			return nil
 		}
-		return a.startPipeline()
+		a.setCoreDesiredRunning(true)
+		if err := a.startPipeline(); err != nil {
+			a.setCoreDesiredRunning(false)
+			return err
+		}
+		return nil
 	})
 }
 
@@ -154,6 +172,7 @@ func (a *App) startPipeline() error {
 	}
 
 	a.log("sing-box запущен")
+	a.setCoreDesiredRunning(true)
 	return nil
 }
 
@@ -375,5 +394,9 @@ func commandWithTimeout(bin string, timeout time.Duration, args ...string) ([]by
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		CreationFlags: createNoWindow,
+		HideWindow:    true,
+	}
 	return cmd.CombinedOutput()
 }

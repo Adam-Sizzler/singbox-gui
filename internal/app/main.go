@@ -7,15 +7,15 @@ import (
 )
 
 func Run(args []string) {
+	hideConsoleWindow()
+
 	startupImport := findImportURIArg(args)
-	if startupImport != "" && notifyRunningInstance(startupImport) {
+	if notifyRunningInstance(startupImport) {
 		return
 	}
 
 	if !isRunningAsAdmin() {
-		if err := relaunchElevated(); err != nil {
-			showError("Admin rights required", "Не удалось запросить права администратора. Запустите приложение от имени администратора.\n\n"+err.Error())
-		}
+		showError("Admin rights required", "Приложение должно быть запущено с правами администратора.")
 		return
 	}
 
@@ -45,6 +45,9 @@ func Run(args []string) {
 	}
 	app.setConfig(cfg)
 	if err := app.startInstanceServer(); err != nil {
+		if notifyRunningInstance(app.startupImport) {
+			return
+		}
 		app.log("WARN: не удалось запустить instance-server: %v", err)
 	}
 	defer app.stopInstanceServer()

@@ -2,6 +2,8 @@
   var urlInput = document.getElementById("url");
   var versionInput = document.getElementById("version");
   var autoUpdateInput = document.getElementById("autoUpdateHours");
+  var autoStartCoreInput = document.getElementById("autoStartCore");
+  var startMinimizedTrayInput = document.getElementById("startMinimizedTray");
   var profileWrap = document.getElementById("profileWrap");
   var profilePicker = document.getElementById("profilePicker");
   var profileValueNode = document.getElementById("profileValue");
@@ -22,10 +24,23 @@
   var logsNode = document.getElementById("logs");
   var settingsTitleNode = document.getElementById("settingsTitle");
   var logsTitleNode = document.getElementById("logsTitle");
-  var releaseTagLinkNode = document.getElementById("releaseTagLink");
+  var releaseMenuWrap = document.getElementById("releaseMenuWrap");
+  var releaseMenuToggleBtn = document.getElementById("releaseMenuToggle");
+  var releaseMenuLabelNode = document.getElementById("releaseMenuLabel");
+  var releaseMenuNode = document.getElementById("releaseMenu");
+  var releaseUpdateBadgeNode = document.getElementById("releaseUpdateBadge");
+  var releaseCurrentCaptionNode = document.getElementById("releaseCurrentCaption");
+  var releaseCurrentLinkNode = document.getElementById("releaseCurrentLink");
+  var releaseLatestRowNode = document.getElementById("releaseLatestRow");
+  var releaseLatestCaptionNode = document.getElementById("releaseLatestCaption");
+  var releaseLatestLinkNode = document.getElementById("releaseLatestLink");
+  var updateAppBtn = document.getElementById("updateAppBtn");
   var labelUrlNode = document.getElementById("labelUrl");
   var labelVersionNode = document.getElementById("labelVersion");
   var labelAutoUpdateNode = document.getElementById("labelAutoUpdate");
+  var labelStartupOptionsNode = document.getElementById("labelStartupOptions");
+  var labelAutoStartCoreNode = document.getElementById("labelAutoStartCore");
+  var labelStartMinimizedTrayNode = document.getElementById("labelStartMinimizedTray");
   var labelProfileNode = document.getElementById("labelProfile");
   var labelRunCheckNode = document.getElementById("labelRunCheck");
   var langRuBtn = document.getElementById("langRu");
@@ -50,12 +65,17 @@
   var profileNames = [];
   var selectedProfile = "";
   var profileMenuOpened = false;
+  var releaseMenuOpened = false;
   var mobileActionsOpened = false;
   var currentLanguage = "ru";
   var lastRunning = false;
   var lastBusy = false;
+  var appUpdateInFlight = false;
   var lastProtoWarn = "";
   var lastAutoUpdateHours = 12;
+  var lastAutoStartCore = false;
+  var lastStartMinimizedTray = false;
+  var lastUIScale = 1;
   var lastUptimeSeconds = 0;
   var lastAppReleaseTag = "";
   var lastAppReleaseURL = "";
@@ -73,6 +93,9 @@
       configUrl: "Ссылка:",
       version: "Версия ядра:",
       autoUpdate: "Автообновление (часы):",
+      startupOptions: "Запуск:",
+      autoStartCore: "Автозапуск ядра при старте приложения",
+      startMinimizedTray: "Запускать приложение свернутым в трей",
       profile: "Профиль:",
       runCheck: "Запуск/проверка:",
       checkConfig: "Проверить",
@@ -88,6 +111,12 @@
       statusConfigOk: "Конфигурация валидна",
       uptime: "Аптайм",
       statusLogsCopied: "Логи скопированы в буфер обмена",
+      releaseButton: "Релиз",
+      releaseCurrent: "Текущий релиз",
+      releaseLatest: "Новый релиз",
+      releaseUnknown: "Недоступно",
+      updateApp: "Обновить приложение",
+      statusUpdateStarted: "Обновление приложения запущено. Окно будет перезапущено.",
       confirmDelete: "Удалить текущий профиль?",
       confirmTitle: "Подтверждение",
       cancel: "Отмена",
@@ -101,6 +130,9 @@
       configUrl: "Config URL:",
       version: "Core version:",
       autoUpdate: "Auto-update (hours):",
+      startupOptions: "Startup:",
+      autoStartCore: "Auto-start core when app starts",
+      startMinimizedTray: "Start app minimized to tray",
       profile: "Profile:",
       runCheck: "Run/Check:",
       checkConfig: "Check",
@@ -116,6 +148,12 @@
       statusConfigOk: "Configuration is valid",
       uptime: "Uptime",
       statusLogsCopied: "Logs copied to clipboard",
+      releaseButton: "Release",
+      releaseCurrent: "Current release",
+      releaseLatest: "New release",
+      releaseUnknown: "Unavailable",
+      updateApp: "Update app",
+      statusUpdateStarted: "Application update started. The app will restart shortly.",
       confirmDelete: "Delete current profile?",
       confirmTitle: "Confirmation",
       cancel: "Cancel",
@@ -180,6 +218,34 @@
     return parsed;
   }
 
+  function normalizeUIScale(raw) {
+    var parsed = parseFloat(String(raw == null ? "" : raw).trim());
+    if (isNaN(parsed) || parsed < 1) {
+      return 1;
+    }
+    if (parsed > 3) {
+      return 3;
+    }
+    return parsed;
+  }
+
+  function applyUIScale(scale) {
+    var normalized = normalizeUIScale(scale);
+    lastUIScale = normalized;
+    if (!document || !document.body || !document.body.style) {
+      return;
+    }
+    if (normalized === 1) {
+      document.body.style.zoom = "";
+      document.body.style.width = "";
+      document.body.style.height = "";
+      return;
+    }
+    document.body.style.zoom = String(normalized);
+    document.body.style.width = String(100 / normalized) + "%";
+    document.body.style.height = String(100 / normalized) + "%";
+  }
+
   function tr(key) {
     var langDict = I18N[currentLanguage] || I18N.ru;
     if (Object.prototype.hasOwnProperty.call(langDict, key)) {
@@ -195,6 +261,9 @@
     if (labelUrlNode) labelUrlNode.textContent = tr("configUrl");
     if (labelVersionNode) labelVersionNode.textContent = tr("version");
     if (labelAutoUpdateNode) labelAutoUpdateNode.textContent = tr("autoUpdate");
+    if (labelStartupOptionsNode) labelStartupOptionsNode.textContent = tr("startupOptions");
+    if (labelAutoStartCoreNode) labelAutoStartCoreNode.textContent = tr("autoStartCore");
+    if (labelStartMinimizedTrayNode) labelStartMinimizedTrayNode.textContent = tr("startMinimizedTray");
     if (labelProfileNode) labelProfileNode.textContent = tr("profile");
     if (labelRunCheckNode) labelRunCheckNode.textContent = tr("runCheck");
     if (checkConfigBtn) checkConfigBtn.textContent = tr("checkConfig");
@@ -205,11 +274,14 @@
     if (mobileActionCheckConfigBtn) mobileActionCheckConfigBtn.textContent = tr("checkConfig");
     if (mobileActionCopyLogsBtn) mobileActionCopyLogsBtn.textContent = tr("copyLogs");
     if (startStopBtn) startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
+    if (releaseCurrentCaptionNode) releaseCurrentCaptionNode.textContent = tr("releaseCurrent");
+    if (releaseLatestCaptionNode) releaseLatestCaptionNode.textContent = tr("releaseLatest");
+    if (updateAppBtn) updateAppBtn.textContent = tr("updateApp");
     if (confirmTitleNode) confirmTitleNode.textContent = tr("confirmTitle");
     if (confirmCancelBtn) confirmCancelBtn.textContent = tr("cancel");
     if (confirmOkBtn) confirmOkBtn.textContent = tr("deleteAction");
     renderUptime(lastUptimeSeconds, lastRunning);
-    renderAppReleaseTag(lastAppReleaseTag, lastAppReleaseURL, lastAppUpdateAvailable, lastAppLatestReleaseTag, lastAppLatestReleaseURL);
+    renderAppReleaseMenu(lastAppReleaseTag, lastAppReleaseURL, lastAppUpdateAvailable, lastAppLatestReleaseTag, lastAppLatestReleaseURL);
 
     if (langRuBtn) {
       langRuBtn.className = currentLanguage === "ru" ? "control lang-btn active" : "control lang-btn";
@@ -223,35 +295,87 @@
     }
   }
 
-  function renderAppReleaseTag(tag, link, hasUpdate, latestTag, latestLink) {
-    if (!releaseTagLinkNode) return;
+  function setReleaseMenuLink(node, label, href) {
+    if (!node) return;
+    var text = String(label || "").trim();
+    var url = String(href || "").trim();
+    var fallback = tr("releaseUnknown");
+    if (!text) text = fallback;
+    node.textContent = text;
+    if (url) {
+      node.href = url;
+      node.className = "release-menu-value release-menu-link";
+      node.title = text;
+      node.setAttribute("tabindex", "0");
+      return;
+    }
+    node.removeAttribute("href");
+    node.className = "release-menu-value";
+    node.title = text;
+    node.setAttribute("tabindex", "-1");
+  }
+
+  function renderAppReleaseMenu(tag, link, hasUpdate, latestTag, latestLink) {
+    if (!releaseMenuToggleBtn || !releaseMenuNode) return;
     var normalizedTag = String(tag || "").trim();
     var normalizedLink = String(link || "").trim();
     var normalizedLatestTag = String(latestTag || "").trim();
     var normalizedLatestLink = String(latestLink || "").trim();
+    var releasesRoot = "https://github.com/Adam-Sizzler/singbox-gui/releases";
     var updateAvailable = !!hasUpdate;
-    if (!normalizedTag || !normalizedLink) {
-      releaseTagLinkNode.hidden = true;
-      releaseTagLinkNode.removeAttribute("href");
-      releaseTagLinkNode.textContent = "";
-      releaseTagLinkNode.title = "";
-      releaseTagLinkNode.className = "release-tag-link";
+    var showLatest = updateAvailable && normalizedLatestTag !== "";
+
+    releaseMenuToggleBtn.hidden = false;
+    if (releaseMenuLabelNode) {
+      releaseMenuLabelNode.textContent = normalizedTag || tr("releaseButton");
+    }
+    if (releaseMenuToggleBtn) {
+      var title = normalizedTag || tr("releaseUnknown");
+      if (updateAvailable && normalizedLatestTag) {
+        title = normalizedTag + " -> " + normalizedLatestTag;
+      }
+      releaseMenuToggleBtn.title = title;
+    }
+    if (releaseUpdateBadgeNode) {
+      releaseUpdateBadgeNode.hidden = !updateAvailable;
+    }
+
+    setReleaseMenuLink(releaseCurrentLinkNode, normalizedTag || tr("releaseUnknown"), normalizedLink || releasesRoot);
+    if (releaseLatestRowNode) {
+      releaseLatestRowNode.hidden = !showLatest;
+    }
+    if (showLatest) {
+      setReleaseMenuLink(releaseLatestLinkNode, normalizedLatestTag, normalizedLatestLink || releasesRoot);
+    }
+
+    if (updateAppBtn) {
+      updateAppBtn.hidden = !showLatest;
+      updateAppBtn.disabled = !showLatest || lastBusy || appUpdateInFlight;
+    }
+  }
+
+  function openReleaseMenu() {
+    if (!releaseMenuToggleBtn || !releaseMenuNode) return;
+    releaseMenuNode.hidden = false;
+    releaseMenuToggleBtn.className = "control release-menu-toggle open";
+    releaseMenuToggleBtn.setAttribute("aria-expanded", "true");
+    releaseMenuOpened = true;
+  }
+
+  function closeReleaseMenu() {
+    if (!releaseMenuToggleBtn || !releaseMenuNode) return;
+    releaseMenuNode.hidden = true;
+    releaseMenuToggleBtn.className = "control release-menu-toggle";
+    releaseMenuToggleBtn.setAttribute("aria-expanded", "false");
+    releaseMenuOpened = false;
+  }
+
+  function toggleReleaseMenu() {
+    if (releaseMenuOpened) {
+      closeReleaseMenu();
       return;
     }
-    releaseTagLinkNode.hidden = false;
-    releaseTagLinkNode.textContent = normalizedTag;
-    if (updateAvailable && normalizedLatestLink) {
-      releaseTagLinkNode.href = normalizedLatestLink;
-    } else {
-      releaseTagLinkNode.href = normalizedLink;
-    }
-    if (updateAvailable && normalizedLatestTag) {
-      releaseTagLinkNode.title = normalizedTag + " -> " + normalizedLatestTag;
-      releaseTagLinkNode.className = "release-tag-link has-update";
-      return;
-    }
-    releaseTagLinkNode.title = normalizedTag;
-    releaseTagLinkNode.className = "release-tag-link";
+    openReleaseMenu();
   }
 
   function renderDefaultStatus(protoWarn) {
@@ -552,6 +676,29 @@
     });
   }
 
+  function runUpdateAppAction() {
+    if (appUpdateInFlight || lastBusy || !lastAppUpdateAvailable || !lastAppLatestReleaseTag) return;
+    appUpdateInFlight = true;
+    if (updateAppBtn) {
+      updateAppBtn.disabled = true;
+    }
+    api("POST", "/api/action/update-app", {}, function (err) {
+      appUpdateInFlight = false;
+      if (err) {
+        setStatus(tr("errorPrefix") + err.message);
+        showToast("error", tr("errorPrefix") + err.message);
+        refreshState(true);
+        return;
+      }
+      closeReleaseMenu();
+      if (updateAppBtn) {
+        updateAppBtn.disabled = true;
+      }
+      setStatus(tr("statusUpdateStarted"));
+      showToast("success", tr("statusUpdateStarted"), 4200);
+    });
+  }
+
   function renderState(state) {
     loadingState = true;
 
@@ -592,6 +739,15 @@
     if (document.activeElement !== autoUpdateInput) {
       autoUpdateInput.value = String(lastAutoUpdateHours);
     }
+    lastAutoStartCore = !!state.auto_start_core;
+    if (autoStartCoreInput) {
+      autoStartCoreInput.checked = lastAutoStartCore;
+    }
+    lastStartMinimizedTray = !!state.start_minimized_to_tray;
+    if (startMinimizedTrayInput) {
+      startMinimizedTrayInput.checked = lastStartMinimizedTray;
+    }
+    applyUIScale(state.ui_scale);
 
     lastRunning = !!state.running;
     lastBusy = !!state.busy;
@@ -656,7 +812,9 @@
         language: currentLanguage,
         url: urlInput.value,
         version: versionInput.value,
-        auto_update_hours: autoUpdateHours
+        auto_update_hours: autoUpdateHours,
+        auto_start_core: !!(autoStartCoreInput && autoStartCoreInput.checked),
+        start_minimized_to_tray: !!(startMinimizedTrayInput && startMinimizedTrayInput.checked)
       }, function (err, state) {
         if (err) {
           setStatus(tr("errorPrefix") + err.message);
@@ -824,11 +982,43 @@
     }
   };
 
+  if (releaseMenuToggleBtn) {
+    releaseMenuToggleBtn.onclick = function () {
+      toggleReleaseMenu();
+    };
+    releaseMenuToggleBtn.onkeydown = function (e) {
+      var key = e.key || "";
+      if (key === "Enter" || key === " " || key === "ArrowDown") {
+        if (e.preventDefault) e.preventDefault();
+        openReleaseMenu();
+        return;
+      }
+      if (key === "Escape") {
+        if (e.preventDefault) e.preventDefault();
+        closeReleaseMenu();
+      }
+    };
+  }
+
+  if (updateAppBtn) {
+    updateAppBtn.onclick = function () {
+      runUpdateAppAction();
+    };
+  }
+
   document.addEventListener("mousedown", function (e) {
     if (!profileMenuOpened || !profileWrap) return;
     var target = e.target || e.srcElement;
     if (profileWrap.contains && !profileWrap.contains(target)) {
       closeProfileMenu();
+    }
+  });
+
+  document.addEventListener("mousedown", function (e) {
+    if (!releaseMenuOpened || !releaseMenuWrap) return;
+    var target = e.target || e.srcElement;
+    if (releaseMenuWrap.contains && !releaseMenuWrap.contains(target)) {
+      closeReleaseMenu();
     }
   });
 
@@ -845,6 +1035,9 @@
     if (key === "Escape") {
       if (profileMenuOpened) {
         closeProfileMenu();
+      }
+      if (releaseMenuOpened) {
+        closeReleaseMenu();
       }
       if (mobileActionsOpened) {
         closeMobileActionsMenu();
@@ -915,6 +1108,12 @@
   urlInput.oninput = saveStateDebounced;
   versionInput.oninput = saveStateDebounced;
   autoUpdateInput.oninput = saveStateDebounced;
+  if (autoStartCoreInput) {
+    autoStartCoreInput.onchange = saveStateDebounced;
+  }
+  if (startMinimizedTrayInput) {
+    startMinimizedTrayInput.onchange = saveStateDebounced;
+  }
   autoUpdateInput.onblur = function () {
     if (!autoUpdateInput) return;
     autoUpdateInput.value = String(normalizeAutoUpdateHours(autoUpdateInput.value));
@@ -980,6 +1179,7 @@
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
       stopPolling();
+      closeReleaseMenu();
       closeMobileActionsMenu();
       return;
     }
@@ -998,6 +1198,7 @@
   window.onbeforeunload = function () {
     stopPolling();
     if (saveTimer) clearTimeout(saveTimer);
+    closeReleaseMenu();
     closeMobileActionsMenu();
     closeConfirmModal();
   };
