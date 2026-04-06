@@ -1,32 +1,3 @@
-:root {
-  --ui-scale: 1;
-  --ui-font-size: 15px;
-  --ui-title-font-size: 23px;
-  --ui-control-height: 32px;
-  --ui-control-radius: 8px;
-  --ui-control-pad-x: 10px;
-  --ui-modal-title-font-size: 20px;
-  --ui-caption-font-size: 12px;
-  --ui-action-font-size: 14px;
-  --ui-label-width: 138px;
-  --ui-control-min-width: 104px;
-  --ui-copy-min-width: 132px;
-  --ui-space-xxs: 2px;
-  --ui-space-xs: 4px;
-  --ui-space-sm: 6px;
-  --ui-space-md: 8px;
-  --ui-space-lg: 10px;
-  --ui-space-xl: 12px;
-  --ui-profile-menu-max-height: 220px;
-  --ui-release-menu-width: 250px;
-  --ui-release-toggle-min-width: 130px;
-  --ui-lang-btn-width: 58px;
-  --ui-uptime-min-width: 120px;
-  --ui-toast-width: 320px;
-  --ui-modal-width: 460px;
-  --ui-checkbox-size: 16px;
-}
-
 html,
 body {
   width: 100%;
@@ -403,6 +374,32 @@ input.control::-ms-clear {
   width: auto;
 }
 
+#startStop {
+  position: relative;
+  padding-right: 28px;
+}
+
+#startStop::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: -4px;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+#startStop.core-running::after {
+  opacity: 1;
+  background: #efbf04;
+  box-shadow: 0 0 6px rgba(239, 191, 4, 0.6);
+}
+
 #copyLogs {
   min-width: 132px;
   width: auto;
@@ -587,12 +584,11 @@ input.control::-ms-clear {
   margin-left: 8px;
 }
 
-.run-controls #startStop + .status {
-  margin-left: 8px;
-}
-
-.run-controls .status + .uptime {
-  margin-left: 8px;
+.run-controls #checkConfig,
+.run-controls #startStop,
+.run-controls .uptime {
+  -ms-flex-item-align: center;
+  align-self: center;
 }
 
 .mobile-actions-wrap {
@@ -641,7 +637,7 @@ input.control::-ms-clear {
 }
 
 .status {
-  display: block;
+  display: none;
   margin-left: 8px;
   min-height: 20px;
   vertical-align: middle;
@@ -650,11 +646,26 @@ input.control::-ms-clear {
   max-width: 100%;
 }
 
-.uptime {
+.status.visible {
   display: block;
+}
+
+.uptime {
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-align: center;
+  align-items: center;
+  -ms-flex-pack: center;
+  justify-content: center;
   margin-left: 8px;
-  min-width: 120px;
+  min-width: 172px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: none;
+  background: #1f1f1f;
   color: #d9d9d9;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -875,31 +886,96 @@ button.control.danger:active {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
-.startup-options {
-  display: block;
+.startup-row {
+  align-items: center;
 }
 
-.startup-option {
+.startup-row-label {
+  line-height: 32px;
+}
+
+.startup-row-control {
   display: -ms-flexbox;
   -ms-flex-align: center;
   display: flex;
   align-items: center;
-  gap: 8px;
-  line-height: 1.35;
-  cursor: pointer;
-  user-select: none;
+  -ms-flex-wrap: wrap;
+  flex-wrap: wrap;
+  min-height: 32px;
 }
 
-.startup-option + .startup-option {
-  margin-top: 6px;
+.startup-secondary-label {
+  margin-left: 30px;
+  margin-right: 8px;
+  white-space: nowrap;
 }
 
-.startup-option input[type="checkbox"] {
-  margin: 0;
-  width: 16px;
-  height: 16px;
+.startup-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 28px;
   -ms-flex: 0 0 auto;
   flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.startup-toggle-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 44px;
+  height: 28px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.startup-toggle-ui {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 28px;
+  border-radius: 999px;
+  background: #262626;
+  border: 1px solid #3a3a3a;
+  transition: background-color 0.14s ease, border-color 0.14s ease;
+}
+
+.startup-toggle-ui::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #bcbcbc;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: transform 0.14s ease, background-color 0.14s ease;
+}
+
+.startup-toggle-input:checked + .startup-toggle-ui {
+  background: #2e5f3d;
+  border-color: #44885a;
+}
+
+.startup-toggle-input:checked + .startup-toggle-ui::after {
+  transform: translateX(16px);
+  background: #e6ffe8;
+}
+
+.startup-toggle-input:focus + .startup-toggle-ui {
+  border-color: #3a3a3a;
+}
+
+.startup-toggle-input:focus-visible + .startup-toggle-ui {
+  box-shadow: none;
+}
+
+.startup-toggle-input:disabled + .startup-toggle-ui {
+  opacity: 0.6;
 }
 
 .toast.visible {
@@ -975,6 +1051,15 @@ body::-webkit-scrollbar-thumb:hover,
     max-width: none;
     padding-right: 0;
     margin-bottom: 8px;
+  }
+
+  .startup-row-control {
+    gap: 8px;
+  }
+
+  .startup-secondary-label {
+    margin-left: 16px;
+    margin-right: 0;
   }
 
   .profile-controls {
@@ -1072,11 +1157,6 @@ body::-webkit-scrollbar-thumb:hover,
 
   .profile-actions .control + .control,
   .run-controls .control + .control {
-    margin-left: 0;
-  }
-
-  .run-controls #startStop + .status,
-  .run-controls .status + .uptime {
     margin-left: 0;
   }
 }

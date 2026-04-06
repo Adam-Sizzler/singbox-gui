@@ -80,19 +80,18 @@
         </div>
       </div>
 
-      <div class="field-row">
-        <label class="field-label" id="labelStartupOptions">Запуск:</label>
-        <div class="field-control">
-          <div class="startup-options">
-            <label class="startup-option" for="autoStartCore">
-              <input id="autoStartCore" type="checkbox">
-              <span id="labelAutoStartCore">Автозапуск ядра при старте приложения</span>
-            </label>
-            <label class="startup-option" for="startMinimizedTray">
-              <input id="startMinimizedTray" type="checkbox">
-              <span id="labelStartMinimizedTray">Запускать приложение свернутым в трей</span>
-            </label>
-          </div>
+      <div class="field-row startup-row">
+        <div class="field-label startup-row-label" id="labelAutoStartCore">Auto start core</div>
+        <div class="field-control startup-row-control">
+          <label class="startup-toggle" for="autoStartCore">
+            <input id="autoStartCore" class="startup-toggle-input" type="checkbox">
+            <span class="startup-toggle-ui" aria-hidden="true"></span>
+          </label>
+          <span id="labelStartMinimizedTray" class="startup-secondary-label">Start in tray</span>
+          <label class="startup-toggle" for="startMinimizedTray">
+            <input id="startMinimizedTray" class="startup-toggle-input" type="checkbox">
+            <span class="startup-toggle-ui" aria-hidden="true"></span>
+          </label>
         </div>
       </div>
 
@@ -102,6 +101,7 @@
           <div class="run-controls">
             <button class="control" id="checkConfig" type="button">Проверить</button>
             <button class="control" id="startStop" type="button">Старт</button>
+            <div id="uptime" class="uptime"></div>
             <div id="mobileActionsWrap" class="mobile-actions-wrap">
               <button class="control mobile-actions-toggle" id="mobileActionsToggle" type="button" aria-haspopup="menu" aria-expanded="false">Действия</button>
               <div id="mobileActionsMenu" class="mobile-actions-menu" role="menu" hidden>
@@ -110,7 +110,6 @@
               </div>
             </div>
             <div id="status" class="status"></div>
-            <div id="uptime" class="uptime"></div>
           </div>
         </div>
       </div>

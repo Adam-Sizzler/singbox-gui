@@ -38,7 +38,6 @@
   var labelUrlNode = document.getElementById("labelUrl");
   var labelVersionNode = document.getElementById("labelVersion");
   var labelAutoUpdateNode = document.getElementById("labelAutoUpdate");
-  var labelStartupOptionsNode = document.getElementById("labelStartupOptions");
   var labelAutoStartCoreNode = document.getElementById("labelAutoStartCore");
   var labelStartMinimizedTrayNode = document.getElementById("labelStartMinimizedTray");
   var labelProfileNode = document.getElementById("labelProfile");
@@ -60,6 +59,8 @@
   var stateReqQueued = false;
   var logsReqInFlight = false;
   var copyLogsInFlight = false;
+  var startupPatchInFlight = false;
+  var startupPatchQueued = false;
   var loadingState = false;
   var ansiCodeRegex = /\x1b\[([0-9;]*)m/g;
   var profileNames = [];
@@ -75,7 +76,6 @@
   var lastAutoUpdateHours = 12;
   var lastAutoStartCore = false;
   var lastStartMinimizedTray = false;
-  var lastUIScale = 1;
   var lastUptimeSeconds = 0;
   var lastAppReleaseTag = "";
   var lastAppReleaseURL = "";
@@ -93,9 +93,8 @@
       configUrl: "Ссылка:",
       version: "Версия ядра:",
       autoUpdate: "Автообновление (часы):",
-      startupOptions: "Запуск:",
-      autoStartCore: "Автозапуск ядра при старте приложения",
-      startMinimizedTray: "Запускать приложение свернутым в трей",
+      autoStartCore: "Auto start core",
+      startMinimizedTray: "Start in tray",
       profile: "Профиль:",
       runCheck: "Запуск/проверка:",
       checkConfig: "Проверить",
@@ -106,8 +105,6 @@
       copyLogs: "Копировать логи",
       actionsMenu: "Действия",
       statusBusy: "Выполняется операция...",
-      statusRunning: "sing-box запущен",
-      statusStopped: "sing-box остановлен",
       statusConfigOk: "Конфигурация валидна",
       uptime: "Аптайм",
       statusLogsCopied: "Логи скопированы в буфер обмена",
@@ -130,9 +127,8 @@
       configUrl: "Config URL:",
       version: "Core version:",
       autoUpdate: "Auto-update (hours):",
-      startupOptions: "Startup:",
-      autoStartCore: "Auto-start core when app starts",
-      startMinimizedTray: "Start app minimized to tray",
+      autoStartCore: "Auto start core",
+      startMinimizedTray: "Start in tray",
       profile: "Profile:",
       runCheck: "Run/Check:",
       checkConfig: "Check",
@@ -143,8 +139,6 @@
       copyLogs: "Copy Logs",
       actionsMenu: "Actions",
       statusBusy: "Operation in progress...",
-      statusRunning: "sing-box is running",
-      statusStopped: "sing-box is stopped",
       statusConfigOk: "Configuration is valid",
       uptime: "Uptime",
       statusLogsCopied: "Logs copied to clipboard",
@@ -201,7 +195,15 @@
   }
 
   function setStatus(msg) {
-    statusNode.textContent = msg || "";
+    if (!statusNode) return;
+    var text = String(msg || "").trim();
+    statusNode.textContent = text;
+    statusNode.className = text ? "status visible" : "status";
+  }
+
+  function renderStartStopIndicator() {
+    if (!startStopBtn) return;
+    startStopBtn.className = lastRunning ? "control core-running" : "control";
   }
 
   function normalizeLanguage(raw) {
@@ -231,7 +233,6 @@
 
   function applyUIScale(scale) {
     var normalized = normalizeUIScale(scale);
-    lastUIScale = normalized;
     if (!document || !document.body || !document.body.style) {
       return;
     }
@@ -261,7 +262,6 @@
     if (labelUrlNode) labelUrlNode.textContent = tr("configUrl");
     if (labelVersionNode) labelVersionNode.textContent = tr("version");
     if (labelAutoUpdateNode) labelAutoUpdateNode.textContent = tr("autoUpdate");
-    if (labelStartupOptionsNode) labelStartupOptionsNode.textContent = tr("startupOptions");
     if (labelAutoStartCoreNode) labelAutoStartCoreNode.textContent = tr("autoStartCore");
     if (labelStartMinimizedTrayNode) labelStartMinimizedTrayNode.textContent = tr("startMinimizedTray");
     if (labelProfileNode) labelProfileNode.textContent = tr("profile");
@@ -274,6 +274,7 @@
     if (mobileActionCheckConfigBtn) mobileActionCheckConfigBtn.textContent = tr("checkConfig");
     if (mobileActionCopyLogsBtn) mobileActionCopyLogsBtn.textContent = tr("copyLogs");
     if (startStopBtn) startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
+    renderStartStopIndicator();
     if (releaseCurrentCaptionNode) releaseCurrentCaptionNode.textContent = tr("releaseCurrent");
     if (releaseLatestCaptionNode) releaseLatestCaptionNode.textContent = tr("releaseLatest");
     if (updateAppBtn) updateAppBtn.textContent = tr("updateApp");
@@ -387,7 +388,7 @@
       setStatus(tr("statusBusy"));
       return;
     }
-    setStatus(lastRunning ? tr("statusRunning") : tr("statusStopped"));
+    setStatus("");
   }
 
   function formatUptime(seconds) {
@@ -740,11 +741,11 @@
       autoUpdateInput.value = String(lastAutoUpdateHours);
     }
     lastAutoStartCore = !!state.auto_start_core;
-    if (autoStartCoreInput) {
+    if (autoStartCoreInput && !startupPatchInFlight && !startupPatchQueued) {
       autoStartCoreInput.checked = lastAutoStartCore;
     }
     lastStartMinimizedTray = !!state.start_minimized_to_tray;
-    if (startMinimizedTrayInput) {
+    if (startMinimizedTrayInput && !startupPatchInFlight && !startupPatchQueued) {
       startMinimizedTrayInput.checked = lastStartMinimizedTray;
     }
     applyUIScale(state.ui_scale);
@@ -759,6 +760,7 @@
     lastAppLatestReleaseTag = String(state.app_latest_release_tag || "").trim();
     lastAppLatestReleaseURL = String(state.app_latest_release_url || "").trim();
     startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
+    renderStartStopIndicator();
     startStopBtn.disabled = lastBusy;
     setCheckButtonsDisabled(lastBusy);
     applyLanguageUI();
@@ -823,6 +825,31 @@
         renderState(state);
       });
     }, 350);
+  }
+
+  function saveStartupOptionsImmediate() {
+    if (loadingState) return;
+    if (startupPatchInFlight) {
+      startupPatchQueued = true;
+      return;
+    }
+    startupPatchInFlight = true;
+    api("POST", "/api/state", {
+      auto_start_core: !!(autoStartCoreInput && autoStartCoreInput.checked),
+      start_minimized_to_tray: !!(startMinimizedTrayInput && startMinimizedTrayInput.checked)
+    }, function (err, state) {
+      startupPatchInFlight = false;
+      if (err) {
+        setStatus(tr("errorPrefix") + err.message);
+        refreshState(true);
+      } else {
+        renderState(state);
+      }
+      if (startupPatchQueued) {
+        startupPatchQueued = false;
+        saveStartupOptionsImmediate();
+      }
+    });
   }
 
   function appendLogSegment(parent, text, fgClass, fgColor) {
@@ -1109,10 +1136,10 @@
   versionInput.oninput = saveStateDebounced;
   autoUpdateInput.oninput = saveStateDebounced;
   if (autoStartCoreInput) {
-    autoStartCoreInput.onchange = saveStateDebounced;
+    autoStartCoreInput.onchange = saveStartupOptionsImmediate;
   }
   if (startMinimizedTrayInput) {
-    startMinimizedTrayInput.onchange = saveStateDebounced;
+    startMinimizedTrayInput.onchange = saveStartupOptionsImmediate;
   }
   autoUpdateInput.onblur = function () {
     if (!autoUpdateInput) return;
