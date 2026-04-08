@@ -5,6 +5,7 @@
   var autoStartCoreInput = document.getElementById("autoStartCore");
   var startMinimizedTrayInput = document.getElementById("startMinimizedTray");
   var profileWrap = document.getElementById("profileWrap");
+  var profileNameInput = document.getElementById("profileNameInput");
   var profilePicker = document.getElementById("profilePicker");
   var profileValueNode = document.getElementById("profileValue");
   var profileMenu = document.getElementById("profileMenu");
@@ -26,9 +27,9 @@
   var logsTitleNode = document.getElementById("logsTitle");
   var releaseMenuWrap = document.getElementById("releaseMenuWrap");
   var releaseMenuToggleBtn = document.getElementById("releaseMenuToggle");
+  var releaseMenuToggleArrowBtn = document.getElementById("releaseMenuToggleArrow");
   var releaseMenuLabelNode = document.getElementById("releaseMenuLabel");
   var releaseMenuNode = document.getElementById("releaseMenu");
-  var releaseUpdateBadgeNode = document.getElementById("releaseUpdateBadge");
   var releaseCurrentCaptionNode = document.getElementById("releaseCurrentCaption");
   var releaseCurrentLinkNode = document.getElementById("releaseCurrentLink");
   var releaseLatestRowNode = document.getElementById("releaseLatestRow");
@@ -61,6 +62,9 @@
   var copyLogsInFlight = false;
   var startupPatchInFlight = false;
   var startupPatchQueued = false;
+  var profileRenameTimer = null;
+  var profileRenameInFlight = false;
+  var profileRenameQueued = false;
   var loadingState = false;
   var ansiCodeRegex = /\x1b\[([0-9;]*)m/g;
   var profileNames = [];
@@ -82,9 +86,12 @@
   var lastAppUpdateAvailable = false;
   var lastAppLatestReleaseTag = "";
   var lastAppLatestReleaseURL = "";
+  var lastAppliedUIScale = null;
+  var lastVisibilitySyncAt = 0;
   var confirmAction = null;
   var STATE_POLL_MS = 1500;
   var LOGS_POLL_MS = 400;
+  var MAX_RENDERED_LOG_LINES = 2000;
 
   var I18N = {
     ru: {
@@ -93,8 +100,8 @@
       configUrl: "Ссылка:",
       version: "Версия ядра:",
       autoUpdate: "Автообновление (часы):",
-      autoStartCore: "Auto start core",
-      startMinimizedTray: "Start in tray",
+      autoStartCore: "Автозапуск ядра",
+      startMinimizedTray: "Запуск в трее",
       profile: "Профиль:",
       runCheck: "Запуск/проверка:",
       checkConfig: "Проверить",
@@ -236,6 +243,10 @@
     if (!document || !document.body || !document.body.style) {
       return;
     }
+    if (lastAppliedUIScale === normalized) {
+      return;
+    }
+    lastAppliedUIScale = normalized;
     if (normalized === 1) {
       document.body.style.zoom = "";
       document.body.style.width = "";
@@ -324,9 +335,12 @@
     var normalizedLatestLink = String(latestLink || "").trim();
     var releasesRoot = "https://github.com/Adam-Sizzler/singbox-gui/releases";
     var updateAvailable = !!hasUpdate;
-    var showLatest = updateAvailable && normalizedLatestTag !== "";
+    var showLatest = updateAvailable && normalizedLatestTag !== "" && normalizedLatestTag !== normalizedTag;
 
     releaseMenuToggleBtn.hidden = false;
+    if (releaseMenuToggleArrowBtn) {
+      releaseMenuToggleArrowBtn.hidden = false;
+    }
     if (releaseMenuLabelNode) {
       releaseMenuLabelNode.textContent = normalizedTag || tr("releaseButton");
     }
@@ -337,9 +351,12 @@
       }
       releaseMenuToggleBtn.title = title;
     }
-    if (releaseUpdateBadgeNode) {
-      releaseUpdateBadgeNode.hidden = !updateAvailable;
+    if (releaseMenuToggleArrowBtn) {
+      releaseMenuToggleArrowBtn.title = releaseMenuToggleBtn ? releaseMenuToggleBtn.title : "";
     }
+
+    lastAppUpdateAvailable = updateAvailable;
+    applyReleaseMenuToggleState();
 
     setReleaseMenuLink(releaseCurrentLinkNode, normalizedTag || tr("releaseUnknown"), normalizedLink || releasesRoot);
     if (releaseLatestRowNode) {
@@ -355,20 +372,33 @@
     }
   }
 
+  function applyReleaseMenuToggleState() {
+    if (releaseMenuToggleBtn) {
+      var labelClass = "control release-menu-toggle";
+      if (releaseMenuOpened) labelClass += " open";
+      if (lastAppUpdateAvailable) labelClass += " status-dot-active";
+      releaseMenuToggleBtn.className = labelClass;
+    }
+    if (releaseMenuToggleArrowBtn) {
+      var arrowClass = "control release-menu-toggle-arrow";
+      if (releaseMenuOpened) arrowClass += " open";
+      releaseMenuToggleArrowBtn.className = arrowClass;
+      releaseMenuToggleArrowBtn.setAttribute("aria-expanded", releaseMenuOpened ? "true" : "false");
+    }
+  }
+
   function openReleaseMenu() {
     if (!releaseMenuToggleBtn || !releaseMenuNode) return;
     releaseMenuNode.hidden = false;
-    releaseMenuToggleBtn.className = "control release-menu-toggle open";
-    releaseMenuToggleBtn.setAttribute("aria-expanded", "true");
     releaseMenuOpened = true;
+    applyReleaseMenuToggleState();
   }
 
   function closeReleaseMenu() {
     if (!releaseMenuToggleBtn || !releaseMenuNode) return;
     releaseMenuNode.hidden = true;
-    releaseMenuToggleBtn.className = "control release-menu-toggle";
-    releaseMenuToggleBtn.setAttribute("aria-expanded", "false");
     releaseMenuOpened = false;
+    applyReleaseMenuToggleState();
   }
 
   function toggleReleaseMenu() {
@@ -452,6 +482,12 @@
     }
     if (profilePicker) {
       profilePicker.title = selectedProfile || "";
+    }
+    if (profileNameInput) {
+      if (document.activeElement !== profileNameInput || (!profileRenameInFlight && !profileRenameTimer)) {
+        profileNameInput.value = selectedProfile || "";
+      }
+      profileNameInput.title = selectedProfile || "";
     }
   }
 
@@ -795,6 +831,46 @@
     });
   }
 
+  function submitProfileRename() {
+    if (!profileNameInput || loadingState) return;
+    var nextName = String(profileNameInput.value || "").trim();
+    if (!nextName) {
+      profileNameInput.value = selectedProfile || "";
+      return;
+    }
+    if (nextName === selectedProfile) return;
+    if (profileRenameInFlight) {
+      profileRenameQueued = true;
+      return;
+    }
+
+    profileRenameInFlight = true;
+    api("POST", "/api/profile/rename", { name: nextName }, function (err, state) {
+      profileRenameInFlight = false;
+      if (err) {
+        setStatus(tr("errorPrefix") + err.message);
+        refreshState(true);
+      } else {
+        renderState(state);
+      }
+      if (profileRenameQueued) {
+        profileRenameQueued = false;
+        submitProfileRename();
+      }
+    });
+  }
+
+  function scheduleProfileRename() {
+    if (!profileNameInput || loadingState) return;
+    if (profileRenameTimer) {
+      clearTimeout(profileRenameTimer);
+    }
+    profileRenameTimer = setTimeout(function () {
+      profileRenameTimer = null;
+      submitProfileRename();
+    }, 250);
+  }
+
   function saveStateDebounced() {
     if (loadingState) return;
     if (saveTimer) {
@@ -958,10 +1034,21 @@
     }
   }
 
+  function trimRenderedLogs() {
+    if (!logsNode) return;
+    var overflow = logsNode.childElementCount - MAX_RENDERED_LOG_LINES;
+    while (overflow > 0 && logsNode.firstChild) {
+      logsNode.removeChild(logsNode.firstChild);
+      overflow--;
+    }
+  }
+
   function appendLogs(entries) {
-    if (!entries || !entries.length) return;
+    if (!logsNode || !entries || !entries.length) return;
 
     var stick = logsNode.scrollTop + logsNode.clientHeight >= logsNode.scrollHeight - 4;
+    var prevScrollTop = logsNode.scrollTop;
+    var prevScrollHeight = logsNode.scrollHeight;
     var frag = document.createDocumentFragment();
 
     for (var i = 0; i < entries.length; i++) {
@@ -973,8 +1060,14 @@
     }
 
     logsNode.appendChild(frag);
+    trimRenderedLogs();
     if (stick) {
       logsNode.scrollTop = logsNode.scrollHeight;
+      return;
+    }
+    var delta = logsNode.scrollHeight - prevScrollHeight;
+    if (delta !== 0) {
+      logsNode.scrollTop = Math.max(0, prevScrollTop + delta);
     }
   }
 
@@ -996,6 +1089,16 @@
     toggleProfileMenu();
   };
 
+  profilePicker.onmouseenter = function () {
+    openProfileMenu();
+  };
+
+  if (profileWrap) {
+    profileWrap.onmouseleave = function () {
+      closeProfileMenu();
+    };
+  }
+
   profilePicker.onkeydown = function (e) {
     var key = e.key || "";
     if (key === "Enter" || key === " " || key === "ArrowDown") {
@@ -1009,7 +1112,7 @@
     }
   };
 
-  if (releaseMenuToggleBtn) {
+  if (releaseMenuToggleBtn && releaseMenuToggleBtn.tagName === "BUTTON") {
     releaseMenuToggleBtn.onclick = function () {
       toggleReleaseMenu();
     };
@@ -1024,6 +1127,33 @@
         if (e.preventDefault) e.preventDefault();
         closeReleaseMenu();
       }
+    };
+  }
+
+  if (releaseMenuToggleArrowBtn) {
+    releaseMenuToggleArrowBtn.onmouseenter = function () {
+      openReleaseMenu();
+    };
+    releaseMenuToggleArrowBtn.onclick = function () {
+      toggleReleaseMenu();
+    };
+    releaseMenuToggleArrowBtn.onkeydown = function (e) {
+      var key = e.key || "";
+      if (key === "Enter" || key === " " || key === "ArrowDown") {
+        if (e.preventDefault) e.preventDefault();
+        openReleaseMenu();
+        return;
+      }
+      if (key === "Escape") {
+        if (e.preventDefault) e.preventDefault();
+        closeReleaseMenu();
+      }
+    };
+  }
+
+  if (releaseMenuWrap) {
+    releaseMenuWrap.onmouseleave = function () {
+      closeReleaseMenu();
     };
   }
 
@@ -1132,6 +1262,12 @@
     setLanguage("en", true);
   };
 
+  if (profileNameInput) {
+    profileNameInput.oninput = scheduleProfileRename;
+    profileNameInput.onchange = submitProfileRename;
+    profileNameInput.onblur = submitProfileRename;
+  }
+
   urlInput.oninput = saveStateDebounced;
   versionInput.oninput = saveStateDebounced;
   autoUpdateInput.oninput = saveStateDebounced;
@@ -1203,6 +1339,11 @@
     runCopyLogsAction();
   };
 
+  function syncStateAndLogs(force) {
+    refreshState(!!force);
+    pollLogs(!!force);
+  }
+
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
       stopPolling();
@@ -1210,21 +1351,26 @@
       closeMobileActionsMenu();
       return;
     }
-    refreshState(true);
-    pollLogs(true);
+    var now = Date.now();
+    if (now - lastVisibilitySyncAt < 600) {
+      startPolling();
+      return;
+    }
+    lastVisibilitySyncAt = now;
+    syncStateAndLogs(false);
     startPolling();
   });
 
-  refreshState(true);
-  pollLogs(true);
-
   if (!document.hidden) {
+    lastVisibilitySyncAt = Date.now();
+    syncStateAndLogs(true);
     startPolling();
   }
 
   window.onbeforeunload = function () {
     stopPolling();
     if (saveTimer) clearTimeout(saveTimer);
+    if (profileRenameTimer) clearTimeout(profileRenameTimer);
     closeReleaseMenu();
     closeMobileActionsMenu();
     closeConfirmModal();

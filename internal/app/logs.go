@@ -45,10 +45,24 @@ func (a *App) appendLogLine(line string) {
 
 	for _, chunk := range chunks {
 		a.nextLogID++
-		a.logEntries = append(a.logEntries, logEntry{ID: a.nextLogID, Text: chunk})
-		if len(a.logEntries) > maxLogLines {
-			a.logEntries = a.logEntries[1:]
-		}
+		a.appendLogEntryLocked(logEntry{ID: a.nextLogID, Text: chunk})
+	}
+}
+
+func (a *App) appendLogEntryLocked(entry logEntry) {
+	if len(a.logEntries) < maxLogLines {
+		a.logEntries = append(a.logEntries, entry)
+		return
+	}
+
+	if len(a.logEntries) == 0 {
+		return
+	}
+
+	a.logEntries[a.logStart] = entry
+	a.logStart++
+	if a.logStart >= len(a.logEntries) {
+		a.logStart = 0
 	}
 }
 
@@ -79,9 +93,13 @@ func (a *App) logsSince(fromID int64) ([]logEntry, int64) {
 	if len(a.logEntries) == 0 {
 		return nil, a.nextLogID
 	}
+	if fromID >= a.nextLogID {
+		return nil, a.nextLogID
+	}
 
 	entries := make([]logEntry, 0, len(a.logEntries))
-	for _, e := range a.logEntries {
+	for i := 0; i < len(a.logEntries); i++ {
+		e := a.logEntries[(a.logStart+i)%len(a.logEntries)]
 		if e.ID > fromID {
 			entries = append(entries, e)
 		}
@@ -96,7 +114,8 @@ func (a *App) logsText() string {
 		return ""
 	}
 	lines := make([]string, 0, len(a.logEntries))
-	for _, e := range a.logEntries {
+	for i := 0; i < len(a.logEntries); i++ {
+		e := a.logEntries[(a.logStart+i)%len(a.logEntries)]
 		lines = append(lines, e.Text)
 	}
 	return strings.Join(lines, "\r\n")

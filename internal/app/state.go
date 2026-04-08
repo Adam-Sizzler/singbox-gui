@@ -39,7 +39,7 @@ const (
 
 	gracefulStopTimeout = 4 * time.Second
 	forceStopTimeout    = 2 * time.Second
-	maxLogLines         = 4000
+	maxLogLines         = 2000
 )
 
 var semverRegex = regexp.MustCompile(`\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?`)
@@ -67,6 +67,7 @@ type App struct {
 
 	logMu      sync.Mutex
 	logEntries []logEntry
+	logStart   int
 	nextLogID  int64
 
 	uiSrvMu   sync.Mutex
@@ -287,6 +288,38 @@ func (a *App) deleteProfile(name string) error {
 	if findProfileIndexByName(cfg.Profiles, cfg.CurrentProfile) < 0 {
 		cfg.CurrentProfile = cfg.Profiles[0].Name
 	}
+	syncLegacyFromCurrent(&cfg)
+	return a.persistConfig(cfg)
+}
+
+func (a *App) renameProfile(name string) error {
+	cfg := a.getConfigSnapshot()
+	normalizeConfigProfiles(&cfg)
+
+	idx := activeProfileIndex(&cfg)
+	if idx < 0 {
+		return errors.New("активный профиль не найден")
+	}
+
+	nextName := sanitizeProfileName(name)
+	if nextName == "" {
+		return errors.New("имя профиля пустое")
+	}
+
+	currentName := cfg.Profiles[idx].Name
+	if strings.EqualFold(currentName, nextName) {
+		cfg.Profiles[idx].Name = nextName
+		cfg.CurrentProfile = nextName
+		syncLegacyFromCurrent(&cfg)
+		return a.persistConfig(cfg)
+	}
+
+	if existingIdx := findProfileIndexByName(cfg.Profiles, nextName); existingIdx >= 0 && existingIdx != idx {
+		return fmt.Errorf("профиль %q уже существует", nextName)
+	}
+
+	cfg.Profiles[idx].Name = nextName
+	cfg.CurrentProfile = nextName
 	syncLegacyFromCurrent(&cfg)
 	return a.persistConfig(cfg)
 }

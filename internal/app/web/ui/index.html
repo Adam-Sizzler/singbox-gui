@@ -14,21 +14,26 @@
         <h1 id="settingsTitle">Настройки</h1>
         <div class="lang-switch">
           <div id="releaseMenuWrap" class="release-menu-wrap">
-            <button class="control release-menu-toggle" id="releaseMenuToggle" type="button" aria-haspopup="menu" aria-expanded="false">
-              <span id="releaseUpdateBadge" class="release-update-badge" hidden></span>
-              <span id="releaseMenuLabel" class="release-menu-label">Release</span>
-              <span class="release-menu-arrow" aria-hidden="true"></span>
-            </button>
+            <div class="release-menu-controls">
+              <div class="control release-menu-toggle" id="releaseMenuToggle">
+                <span id="releaseMenuLabel" class="release-menu-label">Release</span>
+              </div>
+              <button class="control profile-picker release-menu-toggle-arrow" id="releaseMenuToggleArrow" type="button" aria-haspopup="menu" aria-expanded="false">
+                <svg class="profile-arrow release-menu-arrow" stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="20" width="20" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 9l6 6l6 -6"></path>
+                </svg>
+              </button>
+            </div>
             <div id="releaseMenu" class="release-menu" role="menu" hidden>
               <div class="release-menu-item release-menu-item-info" role="none">
                 <span id="releaseCurrentCaption" class="release-menu-caption">Текущий релиз</span>
                 <a id="releaseCurrentLink" class="release-menu-value release-menu-link" href="#" target="_blank" rel="noopener noreferrer" role="menuitem">-</a>
               </div>
-              <div id="releaseLatestRow" class="release-menu-item release-menu-item-info" role="none">
+              <div id="releaseLatestRow" class="release-menu-item release-menu-item-info" role="none" hidden>
                 <span id="releaseLatestCaption" class="release-menu-caption">Последний релиз</span>
                 <a id="releaseLatestLink" class="release-menu-value release-menu-link" href="#" target="_blank" rel="noopener noreferrer" role="menuitem">-</a>
               </div>
-              <button id="updateAppBtn" class="release-menu-item release-menu-action" type="button" role="menuitem">Обновить приложение</button>
+              <button id="updateAppBtn" class="release-menu-item release-menu-action" type="button" role="menuitem" hidden>Обновить приложение</button>
             </div>
           </div>
           <button class="control lang-btn" id="langRu" type="button">RU</button>
@@ -36,14 +41,19 @@
         </div>
       </div>
       <div class="field-row">
-        <label class="field-label" id="labelProfile" for="profilePicker">Профиль:</label>
+        <label class="field-label" id="labelProfile" for="profileNameInput">Профиль:</label>
         <div class="field-control">
           <div class="profile-controls">
             <div class="profile-picker-wrap" id="profileWrap">
-              <button class="control profile-picker" id="profilePicker" type="button" aria-haspopup="listbox" aria-expanded="false">
-                <span id="profileValue" class="profile-value"></span>
-                <span class="profile-arrow" aria-hidden="true"></span>
-              </button>
+              <div class="profile-name-group">
+                <input class="control profile-name-input" id="profileNameInput" type="text" autocomplete="off">
+                <button class="control profile-picker" id="profilePicker" type="button" aria-haspopup="listbox" aria-expanded="false">
+                  <span id="profileValue" class="profile-value"></span>
+                  <svg class="profile-arrow" stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="20" width="20" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 9l6 6l6 -6"></path>
+                  </svg>
+                </button>
+              </div>
               <div id="profileMenu" class="profile-menu" role="listbox" hidden></div>
             </div>
             <div class="profile-actions">

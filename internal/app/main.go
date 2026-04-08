@@ -63,5 +63,6 @@ func newApp(workDir string) *App {
 		configPath:  filepath.Join(workDir, configFileName),
 		singBoxPath: filepath.Join(workDir, singboxExeName),
 		runtimeCfg:  filepath.Join(workDir, runtimeCfgName),
+		logEntries:  make([]logEntry, 0, maxLogLines),
 	}
 }

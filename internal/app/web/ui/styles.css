@@ -10,13 +10,23 @@ body {
   font-family: "Segoe UI", sans-serif;
   font-size: 15px;
   overflow: hidden;
-  scrollbar-color: #1f1f1f #2b2b2b;
+  scrollbar-color: #fdd75a rgba(22, 27, 35, 0.6);
+}
+
+:root {
+  --ui-accent: #fdd75a;
+  --ui-accent-text: #2b2b2b;
+  --ui-accent-hover: #f0ca4a;
+  --ui-accent-active: #e2bb3b;
+  --ui-accent-selected: #dcb63f;
+  --ui-status-dot: #a9a9a9;
+  --ui-status-dot-glow: rgba(169, 169, 169, 0.72);
 }
 
 body {
-  scrollbar-base-color: #1f1f1f;
-  scrollbar-face-color: #1f1f1f;
-  scrollbar-track-color: #2b2b2b;
+  scrollbar-base-color: #fdd75a;
+  scrollbar-face-color: #fdd75a;
+  scrollbar-track-color: #161b23;
   scrollbar-arrow-color: #f3f3f3;
   scrollbar-shadow-color: #2b2b2b;
   scrollbar-darkshadow-color: #2b2b2b;
@@ -26,6 +36,8 @@ body {
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #fdd75a rgba(22, 27, 35, 0.6);
 }
 
 .app {
@@ -197,6 +209,12 @@ body {
   min-width: 0;
 }
 
+input.control {
+  background: #fdd75a !important;
+  color: #2b2b2b !important;
+  font-weight: 700;
+}
+
 button.control,
 input.control {
   -webkit-appearance: none;
@@ -259,11 +277,47 @@ input.control::-ms-clear {
   min-width: 120px;
 }
 
+.profile-name-group {
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.profile-name-input {
+  -ms-flex: 1 1 auto;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 .profile-picker {
   position: relative;
-  width: 100%;
-  text-align: left;
-  padding: 0 34px 0 10px;
+  -ms-flex: 0 0 32px;
+  flex: 0 0 32px;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  padding: 0;
+  margin-left: 2px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  text-align: center;
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  -ms-flex-pack: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+button.profile-picker {
+  padding: 0 !important;
 }
 
 .profile-picker:hover,
@@ -272,12 +326,11 @@ input.control::-ms-clear {
 }
 
 .profile-picker.open {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
+  background: #1f1f1f !important;
 }
 
 .profile-value {
-  display: block;
+  display: none;
   line-height: 32px;
   white-space: nowrap;
   overflow: hidden;
@@ -285,29 +338,68 @@ input.control::-ms-clear {
 }
 
 .profile-arrow {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  margin-top: -6px;
-  border-right: 2px solid #f3f3f3;
-  border-bottom: 2px solid #f3f3f3;
-  transform: rotate(45deg);
+  position: static;
+  width: 20px;
+  height: 20px;
+  margin: 0 auto;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: rotate(0deg);
   transition: transform 0.15s ease;
   pointer-events: none;
 }
 
+.profile-picker:hover .profile-arrow,
 .profile-picker.open .profile-arrow {
-  transform: rotate(225deg);
-  margin-top: -2px;
+  transform: rotate(180deg);
+}
+
+#profilePicker,
+#newProfile,
+#deleteProfile,
+#checkConfig,
+#startStop,
+#copyLogs,
+#releaseMenuToggle,
+#releaseMenuToggleArrow,
+#langRu,
+#langEn {
+  background: #fdd75a !important;
+  color: #2b2b2b !important;
+  font-weight: 700;
+}
+
+#profilePicker:hover,
+#newProfile:hover,
+#deleteProfile:hover,
+#checkConfig:hover,
+#startStop:hover,
+#copyLogs:hover,
+#langRu:hover,
+#langEn:hover {
+  background: #f0ca4a !important;
+}
+
+#profilePicker:active,
+#newProfile:active,
+#deleteProfile:active,
+#checkConfig:active,
+#startStop:active,
+#copyLogs:active,
+#langRu:active,
+#langEn:active {
+  background: #e2bb3b !important;
 }
 
 .profile-menu {
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(100% + 4px);
+  top: 100%;
   z-index: 40;
   background: #1f1f1f;
   border: none;
@@ -316,10 +408,10 @@ input.control::-ms-clear {
   overflow-y: auto;
   overflow-x: hidden;
   -ms-overflow-style: scrollbar;
-  scrollbar-color: #1f1f1f #2b2b2b;
-  scrollbar-base-color: #1f1f1f;
-  scrollbar-face-color: #1f1f1f;
-  scrollbar-track-color: #2b2b2b;
+  scrollbar-color: #fdd75a rgba(22, 27, 35, 0.6);
+  scrollbar-base-color: #fdd75a;
+  scrollbar-face-color: #fdd75a;
+  scrollbar-track-color: #161b23;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
@@ -375,29 +467,70 @@ input.control::-ms-clear {
 }
 
 #startStop {
-  position: relative;
-  padding-right: 28px;
+  min-width: 104px;
 }
 
-#startStop::after {
+#startStop,
+#releaseMenuToggle {
+  position: relative;
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  -ms-flex-pack: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 12px;
+}
+
+#startStop::after,
+#releaseMenuToggle::after {
   content: "";
   position: absolute;
-  right: 12px;
+  left: 12px;
   top: 50%;
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  margin-top: -4px;
+  margin-top: -6px;
   background: transparent;
   box-shadow: none;
   opacity: 0;
-  transition: opacity 0.14s ease;
+  transition: opacity 0.14s ease, background-color 0.14s ease;
+  z-index: 1;
+  pointer-events: none;
 }
 
-#startStop.core-running::after {
+#startStop::before,
+#releaseMenuToggle::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0;
+  transform: scale(1);
+  transition: opacity 0.14s ease;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#startStop.core-running::after,
+#releaseMenuToggle.status-dot-active::after {
   opacity: 1;
-  background: #efbf04;
-  box-shadow: 0 0 6px rgba(239, 191, 4, 0.6);
+  background: #00ffff;
+  box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.3);
+}
+
+#startStop.core-running::before,
+#releaseMenuToggle.status-dot-active::before {
+  opacity: 1;
+  background: rgba(0, 255, 255, 0.5);
+  animation: uiStatusProcessing 1.25s ease-out infinite;
 }
 
 #copyLogs {
@@ -422,54 +555,74 @@ input.control::-ms-clear {
   margin-right: 8px;
 }
 
+.release-menu-controls {
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  display: flex;
+  align-items: center;
+}
+
 .release-menu-toggle {
-  position: relative;
   min-width: 130px;
-  text-align: left;
-  padding: 0 30px 0 12px;
+  max-width: 150px;
+  cursor: default;
+  pointer-events: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .release-menu-label {
   display: block;
-  max-width: 132px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  pointer-events: none;
+}
+
+.release-menu-toggle-arrow {
+  -ms-flex: 0 0 32px;
+  flex: 0 0 32px;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  padding: 0 !important;
+  margin-left: 2px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  display: -ms-flexbox;
+  -ms-flex-align: center;
+  -ms-flex-pack: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .release-menu-arrow {
-  position: absolute;
-  right: 11px;
-  top: 50%;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 6px solid rgba(243, 243, 243, 0.85);
-  margin-top: -2px;
-  transition: transform 0.12s ease;
-}
-
-.release-menu-toggle.open .release-menu-arrow {
-  transform: rotate(180deg);
-  margin-top: -4px;
-}
-
-.release-update-badge {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #efbf04;
-  box-shadow: 0 0 6px rgba(239, 191, 4, 0.6);
+  position: static;
+  width: 20px;
+  height: 20px;
+  margin: 0 auto;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: rotate(0deg);
+  transition: transform 0.15s ease;
   pointer-events: none;
+}
+
+.release-menu-toggle-arrow:hover .release-menu-arrow,
+.release-menu-toggle-arrow.open .release-menu-arrow {
+  transform: rotate(180deg);
 }
 
 .release-menu {
   position: absolute;
-  top: calc(100% + 6px);
+  top: 100%;
   right: 0;
   z-index: 75;
   width: 250px;
@@ -489,6 +642,11 @@ input.control::-ms-clear {
   border: none;
   outline: none;
   border-radius: 8px;
+}
+
+.release-menu-item[hidden],
+.release-menu-action[hidden] {
+  display: none !important;
 }
 
 .release-menu-item-info {
@@ -566,8 +724,21 @@ input.control::-ms-clear {
 .lang-btn.active,
 .lang-btn.active:hover,
 .lang-btn.active:active {
-  background: #2b2b2b !important;
+  background: transparent !important;
+  color: #f3f3f3 !important;
+  box-shadow: none !important;
   cursor: default;
+}
+
+#langRu.lang-btn.active,
+#langRu.lang-btn.active:hover,
+#langRu.lang-btn.active:active,
+#langEn.lang-btn.active,
+#langEn.lang-btn.active:hover,
+#langEn.lang-btn.active:active {
+  background: transparent !important;
+  color: #f3f3f3 !important;
+  box-shadow: none !important;
 }
 
 .run-controls {
@@ -663,8 +834,9 @@ input.control::-ms-clear {
   padding: 0 12px;
   border-radius: 8px;
   border: none;
-  background: #1f1f1f;
-  color: #d9d9d9;
+  background: #fdd75a;
+  color: #2b2b2b;
+  font-weight: 700;
   text-align: center;
   white-space: nowrap;
 }
@@ -704,7 +876,7 @@ input.control::-ms-clear {
   overflow-x: hidden;
   -ms-overflow-style: scrollbar;
   padding: 10px 12px;
-  border: none !important;
+  border: 1px solid #fdd75a !important;
   outline: none !important;
   border-radius: 8px;
   background: #1f1f1f;
@@ -713,10 +885,10 @@ input.control::-ms-clear {
   font-size: 15px;
   line-height: 1.35;
   white-space: pre-wrap;
-  scrollbar-color: #1f1f1f #2b2b2b;
-  scrollbar-base-color: #1f1f1f;
-  scrollbar-face-color: #1f1f1f;
-  scrollbar-track-color: #2b2b2b;
+  scrollbar-color: #fdd75a rgba(22, 27, 35, 0.6);
+  scrollbar-base-color: #fdd75a;
+  scrollbar-face-color: #fdd75a;
+  scrollbar-track-color: #161b23;
   scrollbar-arrow-color: #f3f3f3;
   scrollbar-shadow-color: #2b2b2b;
   scrollbar-darkshadow-color: #2b2b2b;
@@ -957,13 +1129,13 @@ button.control.danger:active {
 }
 
 .startup-toggle-input:checked + .startup-toggle-ui {
-  background: #2e5f3d;
-  border-color: #44885a;
+  background: #fdd75a;
+  border-color: #fdd75a;
 }
 
 .startup-toggle-input:checked + .startup-toggle-ui::after {
   transform: translateX(16px);
-  background: #e6ffe8;
+  background: #2b2b2b;
 }
 
 .startup-toggle-input:focus + .startup-toggle-ui {
@@ -976,6 +1148,21 @@ button.control.danger:active {
 
 .startup-toggle-input:disabled + .startup-toggle-ui {
   opacity: 0.6;
+}
+
+@keyframes uiStatusProcessing {
+  0% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
 }
 
 .toast.visible {
@@ -995,31 +1182,39 @@ html::-webkit-scrollbar,
 body::-webkit-scrollbar,
 #logs::-webkit-scrollbar,
 .profile-menu::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 8px;
+  height: 8px;
 }
 
 html::-webkit-scrollbar-track,
 body::-webkit-scrollbar-track,
 #logs::-webkit-scrollbar-track,
 .profile-menu::-webkit-scrollbar-track {
-  background: #2b2b2b;
+  background: rgba(22, 27, 35, 0.6);
+  border-radius: 999px;
 }
 
 html::-webkit-scrollbar-thumb,
 body::-webkit-scrollbar-thumb,
 #logs::-webkit-scrollbar-thumb,
 .profile-menu::-webkit-scrollbar-thumb {
-  background: #1f1f1f;
-  border: 2px solid #2b2b2b;
-  border-radius: 10px;
+  background: #fdd75a;
+  border: 1px solid rgba(22, 27, 35, 0.8);
+  border-radius: 999px;
 }
 
 html::-webkit-scrollbar-thumb:hover,
 body::-webkit-scrollbar-thumb:hover,
 #logs::-webkit-scrollbar-thumb:hover,
 .profile-menu::-webkit-scrollbar-thumb:hover {
-  background: #272727;
+  background: #f0ca4a;
+}
+
+html::-webkit-scrollbar-corner,
+body::-webkit-scrollbar-corner,
+#logs::-webkit-scrollbar-corner,
+.profile-menu::-webkit-scrollbar-corner {
+  background: rgba(22, 27, 35, 0.6);
 }
 
 @media (max-width: 980px) {

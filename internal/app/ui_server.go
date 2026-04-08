@@ -46,6 +46,7 @@ func (a *App) startUIServer() error {
 	mux.HandleFunc("/api/state", a.handleAPIState)
 	mux.HandleFunc("/api/profile/new", a.handleAPIProfileNew)
 	mux.HandleFunc("/api/profile/delete", a.handleAPIProfileDelete)
+	mux.HandleFunc("/api/profile/rename", a.handleAPIProfileRename)
 	mux.HandleFunc("/api/action/check-config", a.handleAPICheckConfig)
 	mux.HandleFunc("/api/action/start-stop", a.handleAPIStartStop)
 	mux.HandleFunc("/api/action/copy-logs", a.handleAPICopyLogs)
@@ -154,6 +155,23 @@ func (a *App) handleAPIProfileDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.deleteProfile(req.Name); err != nil {
+		writeJSON(w, http.StatusBadRequest, apiError{Error: err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, a.snapshotState())
+}
+
+func (a *App) handleAPIProfileRename(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req profileRequest
+	if err := decodeJSONBody(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, apiError{Error: err.Error()})
+		return
+	}
+	if err := a.renameProfile(req.Name); err != nil {
 		writeJSON(w, http.StatusBadRequest, apiError{Error: err.Error()})
 		return
 	}
