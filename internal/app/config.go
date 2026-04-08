@@ -392,8 +392,7 @@ func applyImportToConfig(cfg *AppConfig, resolvedURL, profileName string) {
 
 	name := sanitizeProfileName(profileName)
 	if name == "" {
-		syncLegacyFromCurrent(cfg)
-		return
+		name = generateNextProfileName(cfg.Profiles)
 	}
 
 	target := findProfileIndexByName(cfg.Profiles, name)

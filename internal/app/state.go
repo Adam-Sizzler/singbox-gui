@@ -18,7 +18,7 @@ import (
 const (
 	configFileName        = "config.yaml"
 	singboxExeName        = "sing-box.exe"
-	runtimeCfgName        = "config.json"
+	legacyRuntimeCfgName  = "config.json"
 	userAgent             = "sfw"
 	createNoWindow        = 0x08000000
 	createNewProcessGroup = 0x00000200
@@ -48,7 +48,6 @@ type App struct {
 	workDir       string
 	configPath    string
 	singBoxPath   string
-	runtimeCfg    string
 	startupImport string
 	protoRegWarn  string
 

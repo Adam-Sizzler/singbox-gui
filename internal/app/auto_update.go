@@ -3,6 +3,7 @@
 package app
 
 import (
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -110,8 +111,10 @@ func (a *App) runAutoUpdateOnce() {
 	active := activeProfileFromConfig(cfg)
 	profileName := strings.TrimSpace(active.Name)
 	if profileName == "" {
-		profileName = "default"
+		profileName = "profile-1"
 	}
+	runtimeCfgPath := a.runtimeConfigPathForProfile(profileName)
+	runtimeCfgFile := filepath.Base(runtimeCfgPath)
 
 	resolvedConfigURL, _, err := resolveSubscriptionInput(active.URL)
 	if err != nil {
@@ -122,12 +125,12 @@ func (a *App) runAutoUpdateOnce() {
 		return
 	}
 
-	updated, err := a.refreshRuntimeConfigFromURL(resolvedConfigURL)
+	updated, err := a.refreshRuntimeConfigFromURL(resolvedConfigURL, runtimeCfgPath)
 	if err != nil {
 		a.log("WARN: автообновление профиля %s: %v", profileName, err)
 		return
 	}
 	if updated {
-		a.log("Автообновление: обновлён %s (профиль: %s)", runtimeCfgName, profileName)
+		a.log("Автообновление: обновлён %s (профиль: %s)", runtimeCfgFile, profileName)
 	}
 }

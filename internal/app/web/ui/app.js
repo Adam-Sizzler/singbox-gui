@@ -23,6 +23,7 @@
   var statusNode = document.getElementById("status");
   var uptimeNode = document.getElementById("uptime");
   var logsNode = document.getElementById("logs");
+  var logsFilterInput = document.getElementById("logsFilter");
   var settingsTitleNode = document.getElementById("settingsTitle");
   var logsTitleNode = document.getElementById("logsTitle");
   var releaseMenuWrap = document.getElementById("releaseMenuWrap");
@@ -66,7 +67,12 @@
   var profileRenameInFlight = false;
   var profileRenameQueued = false;
   var loadingState = false;
+  var logsFilterTimer = null;
   var ansiCodeRegex = /\x1b\[([0-9;]*)m/g;
+  var logBuffer = [];
+  var logsFilterRegex = null;
+  var logsHighlightRegex = null;
+  var logsFilterError = "";
   var profileNames = [];
   var selectedProfile = "";
   var profileMenuOpened = false;
@@ -88,6 +94,7 @@
   var lastAppLatestReleaseURL = "";
   var lastAppliedUIScale = null;
   var lastVisibilitySyncAt = 0;
+  var initialStateRendered = false;
   var confirmAction = null;
   var STATE_POLL_MS = 1500;
   var LOGS_POLL_MS = 400;
@@ -110,6 +117,8 @@
       start: "Старт",
       stop: "Стоп",
       copyLogs: "Копировать логи",
+      logsFilterPlaceholder: "Фильтр RegExp",
+      logsFilterInvalid: "Некорректный RegExp",
       actionsMenu: "Действия",
       statusBusy: "Выполняется операция...",
       statusConfigOk: "Конфигурация валидна",
@@ -144,6 +153,8 @@
       start: "Start",
       stop: "Stop",
       copyLogs: "Copy Logs",
+      logsFilterPlaceholder: "RegExp filter",
+      logsFilterInvalid: "Invalid RegExp",
       actionsMenu: "Actions",
       statusBusy: "Operation in progress...",
       statusConfigOk: "Configuration is valid",
@@ -258,6 +269,16 @@
     document.body.style.height = String(100 / normalized) + "%";
   }
 
+  function revealUIAfterInitialState() {
+    if (initialStateRendered) return;
+    initialStateRendered = true;
+    if (!document || !document.body) return;
+    var cls = document.body.className || "";
+    if (cls.indexOf("ui-loading") < 0) return;
+    cls = cls.replace(/\bui-loading\b/g, " ").replace(/\s+/g, " ").trim();
+    document.body.className = cls;
+  }
+
   function tr(key) {
     var langDict = I18N[currentLanguage] || I18N.ru;
     if (Object.prototype.hasOwnProperty.call(langDict, key)) {
@@ -281,6 +302,11 @@
     if (newProfileBtn) newProfileBtn.textContent = tr("newProfile");
     if (deleteProfileBtn) deleteProfileBtn.textContent = tr("deleteProfile");
     if (copyLogsBtn) copyLogsBtn.textContent = tr("copyLogs");
+    if (logsFilterInput) {
+      var filterHint = tr("logsFilterPlaceholder");
+      logsFilterInput.placeholder = filterHint;
+      logsFilterInput.setAttribute("aria-label", filterHint);
+    }
     if (mobileActionsToggleBtn) mobileActionsToggleBtn.textContent = tr("actionsMenu");
     if (mobileActionCheckConfigBtn) mobileActionCheckConfigBtn.textContent = tr("checkConfig");
     if (mobileActionCopyLogsBtn) mobileActionCopyLogsBtn.textContent = tr("copyLogs");
@@ -305,6 +331,7 @@
     if (mobileActionsToggleBtn) {
       mobileActionsToggleBtn.setAttribute("aria-label", tr("actionsMenu"));
     }
+    setLogsFilterValidation(logsFilterError);
   }
 
   function setReleaseMenuLink(node, label, href) {
@@ -803,6 +830,7 @@
     lastProtoWarn = state.proto_reg_warn || "";
     renderDefaultStatus(lastProtoWarn);
 
+    revealUIAfterInitialState();
     loadingState = false;
   }
 
@@ -820,6 +848,7 @@
       stateReqInFlight = false;
       if (err) {
         setStatus(tr("errorPrefix") + err.message);
+        revealUIAfterInitialState();
       } else {
         renderState(state);
       }
@@ -928,10 +957,13 @@
     });
   }
 
-  function appendLogSegment(parent, text, fgClass, fgColor) {
-    if (!text) return;
+  function createLogSegmentSpan(text, fgClass, fgColor, extraClass) {
+    if (!text) return null;
     var span = document.createElement("span");
     span.className = "log-segment";
+    if (extraClass) {
+      span.className += " " + extraClass;
+    }
     if (fgClass) {
       span.className += " " + fgClass;
     }
@@ -939,7 +971,63 @@
       span.style.color = fgColor;
     }
     span.textContent = text;
-    parent.appendChild(span);
+    return span;
+  }
+
+  function appendLogSegment(parent, text, fgClass, fgColor) {
+    if (!text) return;
+    if (!logsHighlightRegex) {
+      var plain = createLogSegmentSpan(text, fgClass, fgColor, "");
+      if (plain) {
+        parent.appendChild(plain);
+      }
+      return;
+    }
+
+    logsHighlightRegex.lastIndex = 0;
+    var cursor = 0;
+    var match;
+    while ((match = logsHighlightRegex.exec(text)) !== null) {
+      var idx = match.index;
+      var val = match[0] || "";
+
+      if (idx > cursor) {
+        var before = createLogSegmentSpan(text.substring(cursor, idx), fgClass, fgColor, "");
+        if (before) {
+          parent.appendChild(before);
+        }
+      }
+
+      if (val) {
+        var hit = createLogSegmentSpan(val, fgClass, fgColor, "log-match");
+        if (hit) {
+          parent.appendChild(hit);
+        }
+        cursor = idx + val.length;
+      } else {
+        if (idx < text.length) {
+          var z = createLogSegmentSpan(text.charAt(idx), fgClass, fgColor, "log-match");
+          if (z) {
+            parent.appendChild(z);
+          }
+          cursor = idx + 1;
+          logsHighlightRegex.lastIndex = idx + 1;
+        } else {
+          break;
+        }
+      }
+
+      if (cursor >= text.length) {
+        break;
+      }
+    }
+
+    if (cursor < text.length) {
+      var tail = createLogSegmentSpan(text.substring(cursor), fgClass, fgColor, "");
+      if (tail) {
+        parent.appendChild(tail);
+      }
+    }
   }
 
   function xterm256Color(index) {
@@ -1034,6 +1122,13 @@
     }
   }
 
+  function trimLogBuffer() {
+    var overflow = logBuffer.length - MAX_RENDERED_LOG_LINES;
+    if (overflow > 0) {
+      logBuffer.splice(0, overflow);
+    }
+  }
+
   function trimRenderedLogs() {
     if (!logsNode) return;
     var overflow = logsNode.childElementCount - MAX_RENDERED_LOG_LINES;
@@ -1043,20 +1138,128 @@
     }
   }
 
+  function buildLogLineNode(text) {
+    var line = document.createElement("div");
+    line.className = "log-line";
+    renderLogLine(line, text || "");
+    return line;
+  }
+
+  function logsFilterMatches(text) {
+    if (!logsFilterRegex) return true;
+    logsFilterRegex.lastIndex = 0;
+    return logsFilterRegex.test(String(text || ""));
+  }
+
+  function compileLogsFilter(rawPattern) {
+    var pattern = String(rawPattern || "").trim();
+    if (!pattern) {
+      return { regex: null, highlightRegex: null, error: "" };
+    }
+
+    var source = pattern;
+    var flags = "";
+    if (pattern.charAt(0) === "/") {
+      var lastSlash = pattern.lastIndexOf("/");
+      if (lastSlash > 0) {
+        source = pattern.substring(1, lastSlash);
+        flags = pattern.substring(lastSlash + 1);
+      }
+    }
+
+    flags = flags.replace(/g/g, "");
+    try {
+      var regex = new RegExp(source, flags);
+      var highlightRegex = new RegExp(source, flags + "g");
+      return { regex: regex, highlightRegex: highlightRegex, error: "" };
+    } catch (e) {
+      return { regex: null, highlightRegex: null, error: e && e.message ? String(e.message) : "invalid regexp" };
+    }
+  }
+
+  function setLogsFilterValidation(errorMessage) {
+    logsFilterError = String(errorMessage || "");
+    if (!logsFilterInput) return;
+    logsFilterInput.className = logsFilterError ? "control logs-filter invalid" : "control logs-filter";
+    if (logsFilterError) {
+      logsFilterInput.title = tr("logsFilterInvalid") + ": " + logsFilterError;
+      return;
+    }
+    logsFilterInput.title = tr("logsFilterPlaceholder");
+  }
+
+  function rebuildRenderedLogs(stickToBottom) {
+    if (!logsNode) return;
+
+    var stick = typeof stickToBottom === "boolean"
+      ? stickToBottom
+      : (logsNode.scrollTop + logsNode.clientHeight >= logsNode.scrollHeight - 4);
+    var prevScrollTop = logsNode.scrollTop;
+    var prevScrollHeight = logsNode.scrollHeight;
+    var frag = document.createDocumentFragment();
+
+    for (var i = 0; i < logBuffer.length; i++) {
+      var entry = logBuffer[i] || {};
+      if (!logsFilterMatches(entry.text || "")) continue;
+      frag.appendChild(buildLogLineNode(entry.text || ""));
+    }
+
+    logsNode.innerHTML = "";
+    logsNode.appendChild(frag);
+
+    if (stick) {
+      logsNode.scrollTop = logsNode.scrollHeight;
+      return;
+    }
+
+    var delta = logsNode.scrollHeight - prevScrollHeight;
+    var nextScrollTop = prevScrollTop;
+    if (delta !== 0) {
+      nextScrollTop = prevScrollTop + delta;
+    }
+    var maxScrollTop = Math.max(0, logsNode.scrollHeight - logsNode.clientHeight);
+    logsNode.scrollTop = Math.max(0, Math.min(maxScrollTop, nextScrollTop));
+  }
+
+  function applyLogsFilterFromInput() {
+    if (!logsFilterInput) return;
+    var compiled = compileLogsFilter(logsFilterInput.value);
+    if (compiled.error) {
+      setLogsFilterValidation(compiled.error);
+      return;
+    }
+    logsFilterRegex = compiled.regex;
+    logsHighlightRegex = compiled.highlightRegex;
+    setLogsFilterValidation("");
+    rebuildRenderedLogs();
+  }
+
   function appendLogs(entries) {
     if (!logsNode || !entries || !entries.length) return;
+
+    var normalized = [];
+    for (var i = 0; i < entries.length; i++) {
+      var raw = entries[i] || {};
+      var text = String(raw.text || "");
+      var entry = { text: text };
+      normalized.push(entry);
+      logBuffer.push(entry);
+    }
+    if (!normalized.length) return;
+
+    trimLogBuffer();
+    if (logsFilterRegex) {
+      rebuildRenderedLogs();
+      return;
+    }
 
     var stick = logsNode.scrollTop + logsNode.clientHeight >= logsNode.scrollHeight - 4;
     var prevScrollTop = logsNode.scrollTop;
     var prevScrollHeight = logsNode.scrollHeight;
     var frag = document.createDocumentFragment();
 
-    for (var i = 0; i < entries.length; i++) {
-      var text = entries[i].text || "";
-      var line = document.createElement("div");
-      line.className = "log-line";
-      renderLogLine(line, text);
-      frag.appendChild(line);
+    for (var j = 0; j < normalized.length; j++) {
+      frag.appendChild(buildLogLineNode(normalized[j].text));
     }
 
     logsNode.appendChild(frag);
@@ -1271,6 +1474,24 @@
   urlInput.oninput = saveStateDebounced;
   versionInput.oninput = saveStateDebounced;
   autoUpdateInput.oninput = saveStateDebounced;
+  if (logsFilterInput) {
+    logsFilterInput.oninput = function () {
+      if (logsFilterTimer) {
+        clearTimeout(logsFilterTimer);
+      }
+      logsFilterTimer = setTimeout(function () {
+        logsFilterTimer = null;
+        applyLogsFilterFromInput();
+      }, 120);
+    };
+    logsFilterInput.onchange = function () {
+      if (logsFilterTimer) {
+        clearTimeout(logsFilterTimer);
+        logsFilterTimer = null;
+      }
+      applyLogsFilterFromInput();
+    };
+  }
   if (autoStartCoreInput) {
     autoStartCoreInput.onchange = saveStartupOptionsImmediate;
   }
@@ -1370,6 +1591,7 @@
   window.onbeforeunload = function () {
     stopPolling();
     if (saveTimer) clearTimeout(saveTimer);
+    if (logsFilterTimer) clearTimeout(logsFilterTimer);
     if (profileRenameTimer) clearTimeout(profileRenameTimer);
     closeReleaseMenu();
     closeMobileActionsMenu();

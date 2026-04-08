@@ -59,7 +59,6 @@ func (a *App) runUI() error {
 			return
 		}
 		uiInitialized = true
-		a.applyNativeDarkHints(a.systemDark)
 		if startMinimizedToTray && !force {
 			a.mw.Hide()
 			return
@@ -147,17 +146,6 @@ func (a *App) runUI() error {
 	a.startSystemThemeWatcher()
 	a.startPowerResumeWatcher()
 	a.startCoreOnStartupIfEnabled()
-	go func() {
-		for i := 0; i < 4; i++ {
-			time.Sleep(250 * time.Millisecond)
-			if a.mw == nil {
-				continue
-			}
-			a.mw.Synchronize(func() {
-				a.applyNativeDarkHints(a.systemDark)
-			})
-		}
-	}()
 
 	a.mw.Closing().Attach(func(canceled *bool, reason walk.CloseReason) {
 		a.setCoreDesiredRunning(false)
@@ -272,7 +260,7 @@ func applyWindowTheme(h win.HWND, dark bool) {
 
 	setImmersiveDarkMode(h, dark)
 	win.SendMessage(h, win.WM_THEMECHANGED, 0, 0)
-	win.InvalidateRect(h, nil, true)
+	win.InvalidateRect(h, nil, false)
 }
 
 func setWindowCompositionDarkColors(hwnd win.HWND, dark bool) {

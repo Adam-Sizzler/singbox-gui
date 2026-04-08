@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -78,8 +79,10 @@ func (a *App) checkConfigAction() error {
 		active := activeProfileFromConfig(cfg)
 		profileName := strings.TrimSpace(active.Name)
 		if profileName == "" {
-			profileName = "default"
+			profileName = "profile-1"
 		}
+		runtimeCfgPath := a.runtimeConfigPathForProfile(profileName)
+		runtimeCfgFile := filepath.Base(runtimeCfgPath)
 
 		resolvedConfigURL, _, err := resolveSubscriptionInput(active.URL)
 		if err != nil {
@@ -87,10 +90,10 @@ func (a *App) checkConfigAction() error {
 		}
 
 		if strings.TrimSpace(resolvedConfigURL) == "" {
-			if err := a.ensureLocalRuntimeConfig(); err != nil {
+			if err := a.ensureLocalRuntimeConfig(runtimeCfgPath); err != nil {
 				return err
 			}
-			a.log("Проверка конфигурации OK: локальный %s валиден (профиль: %s)", runtimeCfgName, profileName)
+			a.log("Проверка конфигурации OK: локальный %s валиден (профиль: %s)", runtimeCfgFile, profileName)
 			return nil
 		}
 
@@ -132,6 +135,8 @@ func (a *App) startPipeline() error {
 	if err != nil {
 		return err
 	}
+	runtimeCfgPath := a.runtimeConfigPathForProfile(active.Name)
+	runtimeCfgFile := filepath.Base(runtimeCfgPath)
 
 	if active.Name != "" {
 		a.log("Профиль: %s", active.Name)
@@ -150,24 +155,24 @@ func (a *App) startPipeline() error {
 	}
 
 	if strings.TrimSpace(resolvedConfigURL) == "" {
-		if err := a.ensureLocalRuntimeConfig(); err != nil {
+		if err := a.ensureLocalRuntimeConfig(runtimeCfgPath); err != nil {
 			return err
 		}
-		a.log("URL не задан, использую локальный %s", runtimeCfgName)
+		a.log("URL не задан, использую локальный %s", runtimeCfgFile)
 	} else {
-		updated, err := a.refreshRuntimeConfigFromURL(resolvedConfigURL)
+		updated, err := a.refreshRuntimeConfigFromURL(resolvedConfigURL, runtimeCfgPath)
 		if err != nil {
 			return err
 		}
 		if updated {
-			a.log("Скачан и обновлён %s", runtimeCfgName)
+			a.log("Скачан и обновлён %s", runtimeCfgFile)
 		} else {
-			a.log("%s уже актуален", runtimeCfgName)
+			a.log("%s уже актуален", runtimeCfgFile)
 		}
 	}
 
 	a.stopProcess()
-	if err := a.startProcess(); err != nil {
+	if err := a.startProcess(runtimeCfgPath); err != nil {
 		return err
 	}
 
@@ -176,16 +181,16 @@ func (a *App) startPipeline() error {
 	return nil
 }
 
-func (a *App) ensureLocalRuntimeConfig() error {
+func (a *App) ensureLocalRuntimeConfig(runtimeCfgPath string) error {
 	a.runtimeCfgMu.Lock()
 	defer a.runtimeCfgMu.Unlock()
-	return ensureLocalRuntimeConfig(a.runtimeCfg)
+	return ensureLocalRuntimeConfig(runtimeCfgPath)
 }
 
-func (a *App) refreshRuntimeConfigFromURL(url string) (bool, error) {
+func (a *App) refreshRuntimeConfigFromURL(url, runtimeCfgPath string) (bool, error) {
 	a.runtimeCfgMu.Lock()
 	defer a.runtimeCfgMu.Unlock()
-	return downloadRuntimeConfig(url, a.runtimeCfg)
+	return downloadRuntimeConfig(url, runtimeCfgPath)
 }
 
 func (a *App) ensureSingBox(targetVersion string) error {
@@ -206,15 +211,15 @@ func (a *App) ensureSingBox(targetVersion string) error {
 	return nil
 }
 
-func (a *App) startProcess() error {
+func (a *App) startProcess(runtimeCfgPath string) error {
 	if _, err := os.Stat(a.singBoxPath); err != nil {
 		return fmt.Errorf("не найден %s", singboxExeName)
 	}
-	if _, err := os.Stat(a.runtimeCfg); err != nil {
-		return fmt.Errorf("не найден %s", runtimeCfgName)
+	if _, err := os.Stat(runtimeCfgPath); err != nil {
+		return fmt.Errorf("не найден %s", filepath.Base(runtimeCfgPath))
 	}
 
-	cmd := exec.Command(a.singBoxPath, "run", "-c", a.runtimeCfg)
+	cmd := exec.Command(a.singBoxPath, "run", "-c", runtimeCfgPath)
 	cmd.Dir = a.workDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: createNoWindow | createNewProcessGroup}
 	cfg := a.getConfigSnapshot()

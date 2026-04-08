@@ -7,7 +7,7 @@
   <title>sing-box GUI</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="ui-loading">
   <div class="app">
     <section class="panel settings-panel">
       <div class="panel-header">
@@ -129,7 +129,10 @@
     <section class="panel logs-panel">
       <div class="logs-header">
         <h2 id="logsTitle">Логи</h2>
-        <button class="control" id="copyLogs" type="button">Копировать логи</button>
+        <div class="logs-actions">
+          <input id="logsFilter" class="control logs-filter" type="text" spellcheck="false" autocomplete="off" inputmode="search" placeholder="Фильтр RegExp">
+          <button class="control" id="copyLogs" type="button">Копировать логи</button>
+        </div>
       </div>
       <div id="logs" class="control"></div>
     </section>
