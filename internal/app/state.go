@@ -82,7 +82,7 @@ type App struct {
 	instanceSrv   *http.Server
 
 	mw  *walk.MainWindow
-	web *walk.WebView
+	web *webViewHost
 	ni  *walk.NotifyIcon
 
 	autoUpdateMu   sync.Mutex

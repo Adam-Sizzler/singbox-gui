@@ -76,39 +76,6 @@ func (a *App) runUI() error {
 		Background: SolidColorBrush{
 			Color: walk.RGB(43, 43, 43),
 		},
-		Layout: VBox{MarginsZero: true, SpacingZero: true},
-		Children: []Widget{
-			WebView{
-				AssignTo:      &a.web,
-				StretchFactor: 1,
-				OnDocumentCompleted: func(string) {
-					showMainWindow(false)
-				},
-				OnNavigatedError: func(*walk.WebViewNavigatedErrorEventData) {
-					showMainWindow(false)
-				},
-				OnNavigating: func(eventData *walk.WebViewNavigatingEventData) {
-					if eventData == nil {
-						return
-					}
-					if a.tryOpenExternalURL(eventData.Url()) {
-						eventData.SetCanceled(true)
-					}
-				},
-				OnNewWindow: func(eventData *walk.WebViewNewWindowEventData) {
-					if eventData == nil {
-						return
-					}
-					target := strings.TrimSpace(eventData.Url())
-					if target == "" {
-						target = strings.TrimSpace(eventData.UrlContext())
-					}
-					if a.tryOpenExternalURL(target) {
-						eventData.SetCanceled(true)
-					}
-				},
-			},
-		},
 	}
 	if err := decl.Create(); err != nil {
 		return err
@@ -120,20 +87,53 @@ func (a *App) runUI() error {
 		startMinimizedToTray = false
 	}
 
-	if a.web != nil {
-		a.web.SetShortcutsEnabled(true)
-		a.web.SetNativeContextMenuEnabled(true)
-	}
-
 	a.applyNativeDarkHints(a.systemDark)
-	if a.web != nil {
-		if err := a.web.SetURL(uiURL); err != nil {
-			a.log("WARN: не удалось открыть UI страницу: %v", err)
-			showMainWindow(false)
+	a.web = nil
+	webHost, err := newWebViewHost(
+		a.mw.Handle(),
+		func() {
+			if a.mw == nil {
+				return
+			}
+			a.mw.Synchronize(func() {
+				showMainWindow(false)
+			})
+		},
+		func(target string) {
+			_ = a.tryOpenExternalURL(target)
+		},
+	)
+	if err != nil {
+		return err
+	}
+	a.web = webHost
+	a.mw.SizeChanged().Attach(func() {
+		if a.web == nil {
+			return
 		}
-	} else {
+		a.web.Resize()
+	})
+	a.mw.BoundsChanged().Attach(func() {
+		if a.web == nil {
+			return
+		}
+		a.web.NotifyParentWindowPositionChanged()
+	})
+
+	if err := a.web.Navigate(uiURL); err != nil {
+		a.log("WARN: не удалось открыть UI страницу: %v", err)
 		showMainWindow(false)
 	}
+
+	go func() {
+		time.Sleep(3 * time.Second)
+		if a.mw == nil {
+			return
+		}
+		a.mw.Synchronize(func() {
+			showMainWindow(false)
+		})
+	}()
 
 	if a.protoRegWarn != "" {
 		a.log("WARN: не удалось зарегистрировать протокол sing-box://: %s", a.protoRegWarn)
@@ -236,9 +236,6 @@ func (a *App) applyNativeDarkHints(dark bool) {
 	setPreferredAppTheme(dark)
 	if a.mw != nil {
 		applyWindowTheme(a.mw.Handle(), dark)
-	}
-	if a.web != nil {
-		applyWindowTheme(a.web.Handle(), dark)
 	}
 }
 
