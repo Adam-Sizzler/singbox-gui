@@ -40,6 +40,7 @@ const (
 	gracefulStopTimeout = 4 * time.Second
 	forceStopTimeout    = 2 * time.Second
 	maxLogLines         = 2000
+	uiScaleCacheTTL     = 30 * time.Second
 )
 
 var semverRegex = regexp.MustCompile(`\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?`)
@@ -68,6 +69,10 @@ type App struct {
 	logEntries []logEntry
 	logStart   int
 	nextLogID  int64
+
+	uiScaleMu       sync.Mutex
+	cachedUIScale   float64
+	cachedUIScaleAt time.Time
 
 	uiSrvMu   sync.Mutex
 	uiServer  *http.Server
@@ -151,6 +156,20 @@ func (a *App) persistConfig(cfg AppConfig) error {
 	return nil
 }
 
+func (a *App) uiScaleSnapshot() float64 {
+	now := time.Now()
+
+	a.uiScaleMu.Lock()
+	defer a.uiScaleMu.Unlock()
+
+	if a.cachedUIScale <= 0 || a.cachedUIScaleAt.IsZero() || now.Sub(a.cachedUIScaleAt) >= uiScaleCacheTTL {
+		a.cachedUIScale = systemUIScale()
+		a.cachedUIScaleAt = now
+	}
+
+	return a.cachedUIScale
+}
+
 func (a *App) snapshotState() AppState {
 	cfg := a.getConfigSnapshot()
 	active := activeProfileFromConfig(cfg)
@@ -170,7 +189,7 @@ func (a *App) snapshotState() AppState {
 		AutoUpdateHours:     cfg.AutoUpdateHours,
 		AutoStartCore:       cfg.AutoStartCore,
 		StartMinimizedTray:  cfg.StartMinimizedToTray,
-		UIScale:             systemUIScale(),
+		UIScale:             a.uiScaleSnapshot(),
 		UptimeSeconds:       a.processUptimeSeconds(),
 		Running:             a.isProcessRunning(),
 		Busy:                busy,

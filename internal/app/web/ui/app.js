@@ -56,6 +56,7 @@
   var lastLogId = 0;
   var stateTimer = null;
   var logsTimer = null;
+  var uptimeTimer = null;
   var saveTimer = null;
   var stateReqInFlight = false;
   var stateReqQueued = false;
@@ -96,8 +97,16 @@
   var lastVisibilitySyncAt = 0;
   var initialStateRendered = false;
   var confirmAction = null;
-  var STATE_POLL_MS = 1500;
-  var LOGS_POLL_MS = 400;
+  var pollingActive = false;
+  var statePollDelay = 0;
+  var logsPollDelay = 0;
+  var STATE_POLL_IDLE_MS = 4500;
+  var STATE_POLL_RUNNING_MS = 2200;
+  var STATE_POLL_BUSY_MS = 1200;
+  var LOGS_POLL_MIN_MS = 600;
+  var LOGS_POLL_MAX_MS = 3200;
+  var LOGS_POLL_EMPTY_STEP_MS = 300;
+  var LOGS_POLL_ERROR_MS = 4200;
   var MAX_RENDERED_LOG_LINES = 2000;
   var MAX_FILTER_PATTERN_LEN = 256;
 
@@ -505,6 +514,16 @@
     return String(name);
   }
 
+  function sameStringArray(a, b) {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
   function setSelectedProfile(name) {
     selectedProfile = name || "";
     if (profileValueNode) {
@@ -686,25 +705,79 @@
     openMobileActionsMenu();
   }
 
-  function startPolling() {
-    if (stateTimer || logsTimer) return;
-    stateTimer = setInterval(function () {
+  function computeStatePollDelay() {
+    if (lastBusy) return STATE_POLL_BUSY_MS;
+    if (lastRunning) return STATE_POLL_RUNNING_MS;
+    return STATE_POLL_IDLE_MS;
+  }
+
+  function scheduleNextStatePoll(delayMs) {
+    if (!pollingActive) return;
+    if (stateTimer) {
+      clearTimeout(stateTimer);
+      stateTimer = null;
+    }
+    var delay = typeof delayMs === "number" ? delayMs : computeStatePollDelay();
+    if (delay < 0) delay = 0;
+    statePollDelay = delay;
+    stateTimer = setTimeout(function () {
+      stateTimer = null;
       refreshState(false);
-    }, STATE_POLL_MS);
-    logsTimer = setInterval(function () {
+    }, statePollDelay);
+  }
+
+  function scheduleNextLogsPoll(delayMs) {
+    if (!pollingActive) return;
+    if (logsTimer) {
+      clearTimeout(logsTimer);
+      logsTimer = null;
+    }
+    var delay = typeof delayMs === "number" ? delayMs : LOGS_POLL_MIN_MS;
+    if (delay < LOGS_POLL_MIN_MS) delay = LOGS_POLL_MIN_MS;
+    logsPollDelay = delay;
+    logsTimer = setTimeout(function () {
+      logsTimer = null;
       pollLogs(false);
-    }, LOGS_POLL_MS);
+    }, logsPollDelay);
+  }
+
+  function startUptimeTicker() {
+    if (uptimeTimer) return;
+    uptimeTimer = setInterval(function () {
+      if (document.hidden || !lastRunning) return;
+      lastUptimeSeconds++;
+      renderUptime(lastUptimeSeconds, lastRunning);
+    }, 1000);
+  }
+
+  function stopUptimeTicker() {
+    if (!uptimeTimer) return;
+    clearInterval(uptimeTimer);
+    uptimeTimer = null;
+  }
+
+  function startPolling() {
+    if (pollingActive) return;
+    pollingActive = true;
+    if (logsPollDelay < LOGS_POLL_MIN_MS) {
+      logsPollDelay = LOGS_POLL_MIN_MS;
+    }
+    scheduleNextStatePoll(computeStatePollDelay());
+    scheduleNextLogsPoll(logsPollDelay);
+    startUptimeTicker();
   }
 
   function stopPolling() {
+    pollingActive = false;
     if (stateTimer) {
-      clearInterval(stateTimer);
+      clearTimeout(stateTimer);
       stateTimer = null;
     }
     if (logsTimer) {
-      clearInterval(logsTimer);
+      clearTimeout(logsTimer);
       logsTimer = null;
     }
+    stopUptimeTicker();
   }
 
   function runCheckConfigAction() {
@@ -768,6 +841,16 @@
 
   function renderState(state) {
     loadingState = true;
+    var prevLanguage = currentLanguage;
+    var prevRunning = lastRunning;
+    var prevBusy = lastBusy;
+    var prevSelectedProfile = selectedProfile;
+    var prevProfileNames = profileNames.slice(0);
+    var prevAppReleaseTag = lastAppReleaseTag;
+    var prevAppReleaseURL = lastAppReleaseURL;
+    var prevAppUpdateAvailable = lastAppUpdateAvailable;
+    var prevAppLatestReleaseTag = lastAppLatestReleaseTag;
+    var prevAppLatestReleaseURL = lastAppLatestReleaseURL;
 
     currentLanguage = normalizeLanguage(state.language || currentLanguage);
 
@@ -779,7 +862,7 @@
     }
     profileNames = nextNames;
 
-    var preferred = active || selectedProfile;
+    var preferred = active || prevSelectedProfile;
     var hasPreferred = false;
     for (var j = 0; j < profileNames.length; j++) {
       if (profileNames[j] === preferred) {
@@ -787,14 +870,19 @@
         break;
       }
     }
+    var nextSelected = "";
     if (hasPreferred) {
-      setSelectedProfile(preferred);
+      nextSelected = preferred;
     } else if (profileNames.length > 0) {
-      setSelectedProfile(profileNames[0]);
-    } else {
-      setSelectedProfile("");
+      nextSelected = profileNames[0];
     }
-    renderProfileMenu();
+    setSelectedProfile(nextSelected);
+
+    var profilesChanged = !sameStringArray(prevProfileNames, profileNames);
+    var selectedChanged = prevSelectedProfile !== nextSelected;
+    if (profilesChanged || (profileMenuOpened && selectedChanged)) {
+      renderProfileMenu();
+    }
 
     if (document.activeElement !== urlInput) {
       urlInput.value = state.url || "";
@@ -825,11 +913,34 @@
     lastAppUpdateAvailable = !!state.app_update_available;
     lastAppLatestReleaseTag = String(state.app_latest_release_tag || "").trim();
     lastAppLatestReleaseURL = String(state.app_latest_release_url || "").trim();
-    startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
-    renderStartStopIndicator();
-    startStopBtn.disabled = lastBusy;
+    if (startStopBtn) {
+      startStopBtn.disabled = lastBusy;
+    }
     setCheckButtonsDisabled(lastBusy);
-    applyLanguageUI();
+
+    var languageChanged = prevLanguage !== currentLanguage;
+    var releaseChanged =
+      prevAppReleaseTag !== lastAppReleaseTag ||
+      prevAppReleaseURL !== lastAppReleaseURL ||
+      prevAppUpdateAvailable !== lastAppUpdateAvailable ||
+      prevAppLatestReleaseTag !== lastAppLatestReleaseTag ||
+      prevAppLatestReleaseURL !== lastAppLatestReleaseURL;
+
+    if (languageChanged) {
+      applyLanguageUI();
+    } else {
+      if (startStopBtn) {
+        startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
+      }
+      renderStartStopIndicator();
+      renderUptime(lastUptimeSeconds, lastRunning);
+      if (releaseChanged || prevBusy !== lastBusy || prevRunning !== lastRunning) {
+        renderAppReleaseMenu(lastAppReleaseTag, lastAppReleaseURL, lastAppUpdateAvailable, lastAppLatestReleaseTag, lastAppLatestReleaseURL);
+      } else if (updateAppBtn) {
+        updateAppBtn.disabled = !lastAppUpdateAvailable || lastBusy || appUpdateInFlight || !lastAppLatestReleaseTag;
+      }
+    }
+
     lastProtoWarn = state.proto_reg_warn || "";
     renderDefaultStatus(lastProtoWarn);
 
@@ -838,7 +949,12 @@
   }
 
   function refreshState(force) {
-    if (document.hidden && !force) return;
+    if (document.hidden && !force) {
+      if (pollingActive) {
+        scheduleNextStatePoll(computeStatePollDelay());
+      }
+      return;
+    }
     if (stateReqInFlight) {
       if (force) {
         stateReqQueued = true;
@@ -859,6 +975,11 @@
       if (stateReqQueued) {
         stateReqQueued = false;
         refreshState(true);
+        return;
+      }
+
+      if (pollingActive) {
+        scheduleNextStatePoll(computeStatePollDelay());
       }
     });
   }
@@ -1317,16 +1438,42 @@
   }
 
   function pollLogs(force) {
-    if (document.hidden && !force) return;
+    if (document.hidden && !force) {
+      if (pollingActive) {
+        scheduleNextLogsPoll(LOGS_POLL_MAX_MS);
+      }
+      return;
+    }
     if (logsReqInFlight) return;
     logsReqInFlight = true;
     api("GET", "/api/logs?from=" + lastLogId, null, function (err, data) {
       logsReqInFlight = false;
       if (err) {
+        logsPollDelay = LOGS_POLL_ERROR_MS;
+        if (pollingActive) {
+          scheduleNextLogsPoll(logsPollDelay);
+        }
         return;
       }
-      appendLogs(data.entries || []);
-      lastLogId = data.last_id || lastLogId;
+      var entries = data.entries || [];
+      appendLogs(entries);
+
+      var parsedLastId = parseInt(data.last_id, 10);
+      if (!isNaN(parsedLastId) && parsedLastId >= 0) {
+        lastLogId = parsedLastId;
+      }
+
+      if (entries.length > 0) {
+        logsPollDelay = LOGS_POLL_MIN_MS;
+      } else {
+        if (logsPollDelay < LOGS_POLL_MIN_MS) {
+          logsPollDelay = LOGS_POLL_MIN_MS;
+        }
+        logsPollDelay = Math.min(LOGS_POLL_MAX_MS, logsPollDelay + LOGS_POLL_EMPTY_STEP_MS);
+      }
+      if (pollingActive) {
+        scheduleNextLogsPoll(logsPollDelay);
+      }
     });
   }
 
@@ -1603,6 +1750,9 @@
   };
 
   function syncStateAndLogs(force) {
+    if (force) {
+      logsPollDelay = LOGS_POLL_MIN_MS;
+    }
     refreshState(!!force);
     pollLogs(!!force);
   }

@@ -534,7 +534,7 @@ button.profile-picker {
 #releaseMenuToggle.status-dot-active::before {
   opacity: 1;
   background: rgba(0, 255, 255, 0.5);
-  animation: uiStatusProcessing 1.25s ease-out infinite;
+  animation: none;
 }
 
 #copyLogs {
