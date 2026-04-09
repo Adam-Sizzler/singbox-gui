@@ -109,6 +109,8 @@
   var LOGS_POLL_ERROR_MS = 4200;
   var MAX_RENDERED_LOG_LINES = 2000;
   var MAX_FILTER_PATTERN_LEN = 256;
+  var ANSI_ESC_RAW_MARKER = "\x1b[";
+  var ANSI_ESC_FALLBACK_MARKER = "\u2190[";
 
   var I18N = {
     ru: {
@@ -187,7 +189,25 @@
     }
   };
 
-  function api(method, path, body, cb) {
+  function normalizeBridgeError(err) {
+    if (!err) return "request failed";
+    if (typeof err === "string") {
+      return err;
+    }
+    if (err && typeof err.message === "string" && err.message) {
+      return err.message;
+    }
+    if (err && typeof err.error === "string" && err.error) {
+      return err.error;
+    }
+    try {
+      return JSON.stringify(err);
+    } catch (e) {
+      return "request failed";
+    }
+  }
+
+  function apiViaXHR(method, path, body, cb) {
     var xhr = new XMLHttpRequest();
     xhr.open(method, path, true);
     if (method !== "GET") {
@@ -222,6 +242,26 @@
       return;
     }
     xhr.send(body ? JSON.stringify(body) : "{}");
+  }
+
+  function api(method, path, body, cb) {
+    if (typeof cb !== "function") return;
+
+    var bridge = window.__sbApiCall;
+    if (typeof bridge === "function") {
+      bridge({
+        method: String(method || "GET").toUpperCase(),
+        path: String(path || ""),
+        body: body == null ? {} : body
+      }).then(function (resp) {
+        cb(null, resp || {});
+      }).catch(function (err) {
+        cb(new Error(normalizeBridgeError(err)));
+      });
+      return;
+    }
+
+    apiViaXHR(method, path, body, cb);
   }
 
   function setStatus(msg) {
@@ -270,15 +310,12 @@
       return;
     }
     lastAppliedUIScale = normalized;
-    if (normalized === 1) {
-      document.body.style.zoom = "";
-      document.body.style.width = "";
-      document.body.style.height = "";
-      return;
-    }
-    document.body.style.zoom = String(normalized);
-    document.body.style.width = String(100 / normalized) + "%";
-    document.body.style.height = String(100 / normalized) + "%";
+
+    // Native webview already applies DPI scaling. Manual zoom causes
+    // double-scaling and breaks layout stretching.
+    document.body.style.zoom = "";
+    document.body.style.width = "";
+    document.body.style.height = "";
   }
 
   function revealUIAfterInitialState() {
@@ -1100,6 +1137,10 @@
 
   function appendLogSegment(parent, text, fgClass, fgColor) {
     if (!text) return;
+    if (!logsHighlightRegex && !fgClass && !fgColor) {
+      parent.appendChild(document.createTextNode(text));
+      return;
+    }
     if (!logsHighlightRegex) {
       var plain = createLogSegmentSpan(text, fgClass, fgColor, "");
       if (plain) {
@@ -1225,7 +1266,20 @@
   }
 
   function renderLogLine(parent, text) {
-    var src = (text || "").replace(/\u2190\[/g, "\x1b[");
+    var raw = String(text || "");
+    var hasAnsiCodes =
+      raw.indexOf(ANSI_ESC_RAW_MARKER) >= 0 ||
+      raw.indexOf(ANSI_ESC_FALLBACK_MARKER) >= 0;
+    if (!logsHighlightRegex && !hasAnsiCodes) {
+      if (raw) {
+        parent.textContent = raw;
+      }
+      return;
+    }
+    var src = raw;
+    if (src.indexOf(ANSI_ESC_FALLBACK_MARKER) >= 0) {
+      src = src.replace(/\u2190\[/g, "\x1b[");
+    }
     ansiCodeRegex.lastIndex = 0;
 
     var start = 0;
@@ -1271,9 +1325,17 @@
   }
 
   function buildLogLineNode(text) {
+    var lineText = String(text || "");
     var line = document.createElement("div");
     line.className = "log-line";
-    renderLogLine(line, text || "");
+    var hasAnsiCodes =
+      lineText.indexOf(ANSI_ESC_RAW_MARKER) >= 0 ||
+      lineText.indexOf(ANSI_ESC_FALLBACK_MARKER) >= 0;
+    if (!logsHighlightRegex && !hasAnsiCodes) {
+      line.textContent = lineText;
+      return line;
+    }
+    renderLogLine(line, lineText);
     return line;
   }
 
@@ -1330,7 +1392,6 @@
       ? stickToBottom
       : (logsNode.scrollTop + logsNode.clientHeight >= logsNode.scrollHeight - 4);
     var prevScrollTop = logsNode.scrollTop;
-    var prevScrollHeight = logsNode.scrollHeight;
     var frag = document.createDocumentFragment();
 
     for (var i = 0; i < logBuffer.length; i++) {
@@ -1347,13 +1408,8 @@
       return;
     }
 
-    var delta = logsNode.scrollHeight - prevScrollHeight;
-    var nextScrollTop = prevScrollTop;
-    if (delta !== 0) {
-      nextScrollTop = prevScrollTop + delta;
-    }
     var maxScrollTop = Math.max(0, logsNode.scrollHeight - logsNode.clientHeight);
-    logsNode.scrollTop = Math.max(0, Math.min(maxScrollTop, nextScrollTop));
+    logsNode.scrollTop = Math.max(0, Math.min(maxScrollTop, prevScrollTop));
   }
 
   function applyLogsFilterFromInput() {
@@ -1386,7 +1442,6 @@
     if (logsFilterRegex) {
       var stickFiltered = logsNode.scrollTop + logsNode.clientHeight >= logsNode.scrollHeight - 4;
       var prevFilteredScrollTop = logsNode.scrollTop;
-      var prevFilteredScrollHeight = logsNode.scrollHeight;
 
       var removedMatched = 0;
       for (var k = 0; k < removedEntries.length; k++) {
@@ -1409,16 +1464,13 @@
         logsNode.scrollTop = logsNode.scrollHeight;
         return;
       }
-      var filteredDelta = logsNode.scrollHeight - prevFilteredScrollHeight;
-      if (filteredDelta !== 0) {
-        logsNode.scrollTop = Math.max(0, prevFilteredScrollTop + filteredDelta);
-      }
+      var maxFilteredScrollTop = Math.max(0, logsNode.scrollHeight - logsNode.clientHeight);
+      logsNode.scrollTop = Math.max(0, Math.min(maxFilteredScrollTop, prevFilteredScrollTop));
       return;
     }
 
     var stick = logsNode.scrollTop + logsNode.clientHeight >= logsNode.scrollHeight - 4;
     var prevScrollTop = logsNode.scrollTop;
-    var prevScrollHeight = logsNode.scrollHeight;
     var frag = document.createDocumentFragment();
 
     for (var j = 0; j < normalized.length; j++) {
@@ -1431,10 +1483,8 @@
       logsNode.scrollTop = logsNode.scrollHeight;
       return;
     }
-    var delta = logsNode.scrollHeight - prevScrollHeight;
-    if (delta !== 0) {
-      logsNode.scrollTop = Math.max(0, prevScrollTop + delta);
-    }
+    var maxScrollTop = Math.max(0, logsNode.scrollHeight - logsNode.clientHeight);
+    logsNode.scrollTop = Math.max(0, Math.min(maxScrollTop, prevScrollTop));
   }
 
   function pollLogs(force) {
@@ -1774,9 +1824,11 @@
     startPolling();
   });
 
+  // Always perform first sync to remove loading veil even if window was
+  // initially hidden by the host before first show.
+  lastVisibilitySyncAt = Date.now();
+  syncStateAndLogs(true);
   if (!document.hidden) {
-    lastVisibilitySyncAt = Date.now();
-    syncStateAndLogs(true);
     startPolling();
   }
 

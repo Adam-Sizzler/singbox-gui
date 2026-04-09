@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/lxn/walk"
+	"github.com/lxn/win"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -220,5 +221,13 @@ func ensureSingBoxProtocolRegistration() error {
 }
 
 func showError(title, message string) {
-	_ = walk.MsgBox(nil, title, message, walk.MsgBoxIconError)
+	if walk.MsgBox(nil, title, message, walk.MsgBoxIconError) != 0 {
+		return
+	}
+	titlePtr, titleErr := syscall.UTF16PtrFromString(title)
+	msgPtr, msgErr := syscall.UTF16PtrFromString(message)
+	if titleErr != nil || msgErr != nil {
+		return
+	}
+	_ = win.MessageBox(0, msgPtr, titlePtr, win.MB_OK|win.MB_ICONERROR|win.MB_TOPMOST)
 }

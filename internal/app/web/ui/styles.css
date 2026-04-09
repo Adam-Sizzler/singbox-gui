@@ -879,16 +879,16 @@ button.profile-picker {
   white-space: nowrap;
 }
 
-.logs-filter {
+input.logs-filter {
   display: block;
   -ms-flex: 0 0 248px;
   flex: 0 0 248px;
   width: 248px;
   min-width: 248px;
   max-width: 248px;
-  background: #1f1f1f !important;
-  color: #f3f3f3 !important;
-  font-weight: 400 !important;
+  background: #fdd75a !important;
+  color: #2b2b2b !important;
+  font-weight: 700 !important;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -899,9 +899,9 @@ button.profile-picker {
   margin-left: 8px;
 }
 
-.logs-filter::placeholder {
-  color: #d5d9df;
-  font-weight: 400 !important;
+input.logs-filter::placeholder {
+  color: #6e5a1a;
+  font-weight: 700 !important;
   opacity: 1;
 }
 

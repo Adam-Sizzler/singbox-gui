@@ -22,6 +22,24 @@ fi
 release_tag="$(printf '%s' "$release_tag" | tr -d '\r\n')"
 
 ldflags="-H=windowsgui -X singbox-gui-client/internal/app.appReleaseTag=${release_tag}"
-GOOS=windows GOARCH=amd64 go build -a -ldflags "$ldflags" -o singbox-gui.exe ./cmd/singbox-gui
+
+: "${CC:=x86_64-w64-mingw32-gcc}"
+: "${CXX:=x86_64-w64-mingw32-g++}"
+shim_include="$(pwd)/build/windows/msheaders"
+
+if ! command -v "$CC" >/dev/null 2>&1; then
+  echo "error: C compiler not found: $CC" >&2
+  echo "hint: install mingw-w64 (x86_64) or override CC/CXX environment variables." >&2
+  exit 1
+fi
+if ! command -v "$CXX" >/dev/null 2>&1; then
+  echo "error: C++ compiler not found: $CXX" >&2
+  echo "hint: install mingw-w64 (x86_64) or override CC/CXX environment variables." >&2
+  exit 1
+fi
+
+CGO_CXXFLAGS="-I${shim_include} ${CGO_CXXFLAGS:-}" \
+CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC="$CC" CXX="$CXX" \
+  go build -a -ldflags "$ldflags" -o singbox-gui.exe ./cmd/singbox-gui
 
 echo "Built: $(pwd)/singbox-gui.exe"

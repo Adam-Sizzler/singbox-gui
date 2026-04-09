@@ -293,11 +293,7 @@ func writeSelfUpdateScript() (string, error) {
 func (a *App) closeForSelfUpdate() {
 	go func() {
 		time.Sleep(200 * time.Millisecond)
-		if a.mw != nil {
-			a.mw.Synchronize(func() {
-				_ = a.mw.Close()
-			})
-		}
+		a.requestMainWindowClose()
 	}()
 }
 

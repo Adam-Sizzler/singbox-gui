@@ -32,6 +32,8 @@ Russian version: `README.ru.md`
 
 - Windows 10/11 x64
 - Go toolchain (for local build)
+- C/C++ toolchain for cgo builds (`mingw-w64` when building on Linux)
+- WebView2 runtime on target machine (preinstalled on Windows 11)
 - Network access for downloading `sing-box.exe` / remote config
 
 ## Build

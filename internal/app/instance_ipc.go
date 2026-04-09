@@ -3,102 +3,157 @@
 package app
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
-	"net"
-	"net/http"
+	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/lxn/win"
+	"golang.org/x/sys/windows"
 )
 
 const (
-	instanceServerAddr        = "127.0.0.1:36127"
-	instanceServerBaseURL     = "http://" + instanceServerAddr
-	instanceServerPingPath    = "/instance/ping"
-	instanceServerActivateURL = "/instance/activate"
-	instanceServerAppName     = "singbox-gui"
+	instanceMutexName     = `Local\singbox-gui-instance-mutex`
+	instanceActivateName  = `Local\singbox-gui-instance-activate`
+	instancePayloadFile   = ".instance-activate.json"
+	instanceWaitTimeoutMS = uint32(350)
+	instanceShutdownWait  = 2 * time.Second
 )
 
-type instancePingResponse struct {
-	App string `json:"app"`
-}
+var errInstanceAlreadyRunning = errors.New("instance already running")
 
 type instanceActivateRequest struct {
 	ImportURI string `json:"import_uri"`
 }
 
-func (a *App) startInstanceServer() error {
-	a.instanceSrvMu.Lock()
-	defer a.instanceSrvMu.Unlock()
+func (a *App) startInstanceIPC() error {
+	a.instanceIPCMu.Lock()
+	defer a.instanceIPCMu.Unlock()
 
-	if a.instanceSrv != nil {
+	if a.instanceMutex != 0 {
 		return nil
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc(instanceServerPingPath, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		writeJSON(w, http.StatusOK, instancePingResponse{App: instanceServerAppName})
-	})
-	mux.HandleFunc(instanceServerActivateURL, a.handleInstanceActivate)
-
-	ln, err := net.Listen("tcp", instanceServerAddr)
+	mutexName, err := windows.UTF16PtrFromString(instanceMutexName)
 	if err != nil {
 		return err
 	}
-
-	srv := &http.Server{
-		Handler:           mux,
-		ReadHeaderTimeout: 4 * time.Second,
+	mutexHandle, err := windows.CreateMutex(nil, false, mutexName)
+	if err != nil {
+		if mutexHandle != 0 {
+			_ = windows.CloseHandle(mutexHandle)
+		}
+		if errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
+			return errInstanceAlreadyRunning
+		}
+		return err
 	}
-	go func() {
-		_ = srv.Serve(ln)
-	}()
 
-	a.instanceSrv = srv
+	eventName, err := windows.UTF16PtrFromString(instanceActivateName)
+	if err != nil {
+		_ = windows.CloseHandle(mutexHandle)
+		return err
+	}
+	eventHandle, err := windows.CreateEvent(nil, 0, 0, eventName)
+	if err != nil && !errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
+		_ = windows.CloseHandle(mutexHandle)
+		if eventHandle != 0 {
+			_ = windows.CloseHandle(eventHandle)
+		}
+		return err
+	}
+	if eventHandle == 0 {
+		_ = windows.CloseHandle(mutexHandle)
+		return windows.ERROR_INVALID_HANDLE
+	}
+
+	stopCh := make(chan struct{})
+	doneCh := make(chan struct{})
+
+	a.instanceMutex = mutexHandle
+	a.instanceEvent = eventHandle
+	a.instanceStop = stopCh
+	a.instanceDone = doneCh
+
+	_ = os.Remove(a.instancePayloadPath())
+	go a.instanceIPCEventLoop(eventHandle, stopCh, doneCh)
 	return nil
 }
 
-func (a *App) stopInstanceServer() {
-	a.instanceSrvMu.Lock()
-	srv := a.instanceSrv
-	a.instanceSrv = nil
-	a.instanceSrvMu.Unlock()
+func (a *App) stopInstanceIPC() {
+	a.instanceIPCMu.Lock()
+	mutexHandle := a.instanceMutex
+	eventHandle := a.instanceEvent
+	stopCh := a.instanceStop
+	doneCh := a.instanceDone
 
-	if srv == nil {
-		return
+	a.instanceMutex = 0
+	a.instanceEvent = 0
+	a.instanceStop = nil
+	a.instanceDone = nil
+	a.instanceIPCMu.Unlock()
+
+	if stopCh != nil {
+		close(stopCh)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	_ = srv.Shutdown(ctx)
+	if doneCh != nil {
+		select {
+		case <-doneCh:
+		case <-time.After(instanceShutdownWait):
+		}
+	}
+
+	if eventHandle != 0 {
+		_ = windows.CloseHandle(eventHandle)
+	}
+	if mutexHandle != 0 {
+		_ = windows.CloseHandle(mutexHandle)
+	}
+	_ = os.Remove(a.instancePayloadPath())
 }
 
-func (a *App) handleInstanceActivate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+func (a *App) instanceIPCEventLoop(event windows.Handle, stop <-chan struct{}, done chan<- struct{}) {
+	defer close(done)
+
+	for {
+		select {
+		case <-stop:
+			return
+		default:
+		}
+
+		state, err := windows.WaitForSingleObject(event, instanceWaitTimeoutMS)
+		if err != nil {
+			return
+		}
+
+		switch state {
+		case windows.WAIT_OBJECT_0:
+			a.handleInstanceActivateSignal()
+		case uint32(windows.WAIT_TIMEOUT):
+			continue
+		default:
+			return
+		}
+	}
+}
+
+func (a *App) handleInstanceActivateSignal() {
+	payload, ok, err := readInstanceActivateRequest(a.instancePayloadPath())
+	if err != nil {
+		a.log("ERROR: ошибка чтения instance IPC payload: %v", err)
+		return
+	}
+	if !ok {
 		return
 	}
 
-	var req instanceActivateRequest
-	if err := decodeJSONBody(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, apiError{Error: err.Error()})
-		return
-	}
-
-	if err := a.applyImportURI(req.ImportURI); err != nil {
+	if err := a.applyImportURI(payload.ImportURI); err != nil {
 		a.log("ERROR: import URI не применен: %v", err)
-		writeJSON(w, http.StatusInternalServerError, apiError{Error: err.Error()})
 		return
 	}
-
 	a.focusMainWindow()
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (a *App) applyImportURI(rawImport string) error {
@@ -124,67 +179,90 @@ func (a *App) applyImportURI(rawImport string) error {
 }
 
 func (a *App) focusMainWindow() {
-	if a.mw == nil {
+	if a.web == nil {
 		return
 	}
 
-	a.mw.Synchronize(func() {
-		if a.mw == nil {
-			return
-		}
-		hwnd := a.mw.Handle()
-		if hwnd == 0 {
-			return
-		}
-		win.ShowWindow(hwnd, win.SW_RESTORE)
-		win.ShowWindow(hwnd, win.SW_SHOW)
-		win.BringWindowToTop(hwnd)
-		win.SetForegroundWindow(hwnd)
+	a.web.Dispatch(func() {
+		a.showMainWindowFromTray()
 	})
 }
 
-func notifyRunningInstance(importURI string) bool {
-	trimmed := strings.TrimSpace(importURI)
-
-	client := &http.Client{Timeout: 600 * time.Millisecond}
-	if !instanceServerAlive(client) {
+func notifyRunningInstance(workDir, importURI string) bool {
+	payloadPath := instancePayloadPath(workDir)
+	payload := instanceActivateRequest{ImportURI: strings.TrimSpace(importURI)}
+	if err := writeInstanceActivateRequest(payloadPath, payload); err != nil {
 		return false
 	}
 
-	body, err := json.Marshal(instanceActivateRequest{ImportURI: trimmed})
+	eventName, err := windows.UTF16PtrFromString(instanceActivateName)
 	if err != nil {
+		_ = os.Remove(payloadPath)
 		return false
 	}
-
-	req, err := http.NewRequest(http.MethodPost, instanceServerBaseURL+instanceServerActivateURL, bytes.NewReader(body))
+	eventHandle, err := windows.OpenEvent(windows.EVENT_MODIFY_STATE, false, eventName)
 	if err != nil {
+		_ = os.Remove(payloadPath)
 		return false
 	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	defer windows.CloseHandle(eventHandle)
 
-	resp, err := client.Do(req)
-	if err != nil {
+	if err := windows.SetEvent(eventHandle); err != nil {
+		_ = os.Remove(payloadPath)
 		return false
 	}
-	defer resp.Body.Close()
-
-	return resp.StatusCode == http.StatusOK
+	return true
 }
 
-func instanceServerAlive(client *http.Client) bool {
-	resp, err := client.Get(instanceServerBaseURL + instanceServerPingPath)
+func instancePayloadPath(workDir string) string {
+	_ = workDir
+	return filepath.Join(os.TempDir(), instancePayloadFile)
+}
+
+func (a *App) instancePayloadPath() string {
+	return instancePayloadPath(a.workDir)
+}
+
+func writeInstanceActivateRequest(path string, req instanceActivateRequest) error {
+	data, err := json.Marshal(req)
 	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return false
+		return err
 	}
 
-	var ping instancePingResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ping); err != nil {
-		return false
+	dir := filepath.Dir(path)
+	if dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
 	}
-	return strings.EqualFold(strings.TrimSpace(ping.App), instanceServerAppName)
+
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+func readInstanceActivateRequest(path string) (instanceActivateRequest, bool, error) {
+	var req instanceActivateRequest
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return req, false, nil
+		}
+		return req, false, err
+	}
+	_ = os.Remove(path)
+
+	if len(data) == 0 {
+		return req, true, nil
+	}
+	if err := json.Unmarshal(data, &req); err != nil {
+		return req, false, err
+	}
+	return req, true, nil
 }

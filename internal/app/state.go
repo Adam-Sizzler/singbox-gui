@@ -5,7 +5,6 @@ package app
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -13,6 +12,8 @@ import (
 	"time"
 
 	"github.com/lxn/walk"
+	"github.com/lxn/win"
+	"golang.org/x/sys/windows"
 )
 
 const (
@@ -49,6 +50,7 @@ type App struct {
 	workDir       string
 	configPath    string
 	singBoxPath   string
+	debugLogPath  string
 	startupImport string
 	protoRegWarn  string
 
@@ -70,20 +72,22 @@ type App struct {
 	logStart   int
 	nextLogID  int64
 
+	debugMu sync.Mutex
+
 	uiScaleMu       sync.Mutex
 	cachedUIScale   float64
 	cachedUIScaleAt time.Time
 
-	uiSrvMu   sync.Mutex
-	uiServer  *http.Server
-	uiBaseURL string
+	instanceIPCMu sync.Mutex
+	instanceMutex windows.Handle
+	instanceEvent windows.Handle
+	instanceStop  chan struct{}
+	instanceDone  chan struct{}
 
-	instanceSrvMu sync.Mutex
-	instanceSrv   *http.Server
-
-	mw  *walk.MainWindow
-	web *webViewHost
-	ni  *walk.NotifyIcon
+	trayOwner *walk.MainWindow
+	web       *webViewHost
+	webHwnd   win.HWND
+	ni        *walk.NotifyIcon
 
 	autoUpdateMu   sync.Mutex
 	autoUpdateStop chan struct{}
@@ -100,6 +104,9 @@ type App struct {
 	themeWatchStop chan struct{}
 	powerWatchStop chan struct{}
 	systemDark     bool
+
+	uiCloseMu        sync.Mutex
+	uiCloseRequested bool
 
 	coreDesiredMu      sync.Mutex
 	coreDesiredRunning bool

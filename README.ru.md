@@ -32,6 +32,8 @@ English version: `README.md`
 
 - Windows 10/11 x64
 - Go toolchain (для локальной сборки)
+- C/C++ toolchain для cgo-сборки (`mingw-w64` при сборке на Linux)
+- WebView2 runtime на машине пользователя (в Windows 11 обычно уже установлен)
 - Сеть для загрузки `sing-box.exe` и удаленного конфига
 
 ## Сборка

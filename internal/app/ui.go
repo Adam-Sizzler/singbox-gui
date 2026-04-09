@@ -6,15 +6,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
 	"unsafe"
 
 	"github.com/lxn/walk"
-	. "github.com/lxn/walk/declarative"
 	"github.com/lxn/win"
+	webview "github.com/webview/webview_go"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -37,103 +36,90 @@ type windowCompositionAttribData struct {
 }
 
 func (a *App) runUI() error {
+	a.setUICloseRequested(false)
+	a.debugf("ui: runUI started")
+
 	a.systemDark = detectSystemDarkTheme()
 	setPreferredAppTheme(a.systemDark)
 	startupCfg := a.getConfigSnapshot()
 	startMinimizedToTray := startupCfg.StartMinimizedToTray && strings.TrimSpace(a.startupImport) == ""
+	a.debugf("ui: systemDark=%v startMinimizedToTray=%v", a.systemDark, startMinimizedToTray)
 
-	if err := a.startUIServer(); err != nil {
+	uiHTML, err := loadEmbeddedUIHTML()
+	if err != nil {
+		a.debugf("ui: loadEmbeddedUIHTML failed: %v", err)
 		return err
 	}
-	created := false
-	defer func() {
-		if !created {
-			a.stopUIServer()
-		}
-	}()
+	defer a.shutdownUI()
 
-	uiURL := a.uiBaseURL + "/?ts=" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	uiInitialized := false
 	showMainWindow := func(force bool) {
-		if uiInitialized || a.mw == nil {
+		if uiInitialized {
 			return
 		}
 		uiInitialized = true
 		if startMinimizedToTray && !force {
-			a.mw.Hide()
+			a.hideMainWindow()
 			return
 		}
-		a.mw.Show()
-		a.mw.BringToTop()
+		a.showMainWindowFromTray()
 	}
 
-	decl := MainWindow{
-		AssignTo: &a.mw,
-		Title:    "Sing-box GUI",
-		Size:     Size{Width: 900, Height: 560},
-		MinSize:  Size{Width: 780, Height: 460},
-		Visible:  false,
-		Background: SolidColorBrush{
-			Color: walk.RGB(43, 43, 43),
-		},
-	}
-	if err := decl.Create(); err != nil {
+	if err := a.ensureTrayOwnerWindow(); err != nil {
+		a.debugf("ui: ensureTrayOwnerWindow failed: %v", err)
 		return err
 	}
-	created = true
+	a.debugf("ui: tray owner hwnd=%#x", uintptr(a.trayOwner.Handle()))
+
+	webHost, err := newWebViewHost(
+		func() {
+			a.debugf("ui: webview ready callback")
+			showMainWindow(false)
+		},
+		func(target string) {
+			a.debugf("ui: external url requested: %s", target)
+			_ = a.tryOpenExternalURL(target)
+		},
+	)
+	if err != nil {
+		a.debugf("ui: newWebViewHost failed: %v", err)
+		return err
+	}
+	a.web = webHost
+	a.webHwnd = webHost.HWND()
+	if a.webHwnd == 0 {
+		a.debugf("ui: invalid web hwnd")
+		return syscall.EINVAL
+	}
+	a.debugf("ui: web host initialized")
+
+	if err := a.bindUIBridge(); err != nil {
+		a.debugf("ui: bindUIBridge failed: %v", err)
+		return err
+	}
+
+	if err := a.web.SetTitle("Sing-box GUI"); err != nil {
+		return err
+	}
+	if err := a.web.SetSize(900, 560, webview.HintNone); err != nil {
+		return err
+	}
+	if err := a.web.SetSize(780, 460, webview.HintMin); err != nil {
+		return err
+	}
+
 	a.applyMainWindowIcon()
 	if err := a.initNotifyIcon(); err != nil {
 		a.log("WARN: не удалось инициализировать иконку трея: %v", err)
 		startMinimizedToTray = false
 	}
-
 	a.applyNativeDarkHints(a.systemDark)
-	a.web = nil
-	webHost, err := newWebViewHost(
-		a.mw.Handle(),
-		func() {
-			if a.mw == nil {
-				return
-			}
-			a.mw.Synchronize(func() {
-				showMainWindow(false)
-			})
-		},
-		func(target string) {
-			_ = a.tryOpenExternalURL(target)
-		},
-	)
-	if err != nil {
+	a.hideMainWindow()
+
+	if err := a.web.SetHTML(uiHTML); err != nil {
+		a.debugf("ui: SetHTML failed: %v", err)
 		return err
 	}
-	a.web = webHost
-	a.mw.SizeChanged().Attach(func() {
-		if a.web == nil {
-			return
-		}
-		a.web.Resize()
-	})
-	a.mw.BoundsChanged().Attach(func() {
-		if a.web == nil {
-			return
-		}
-		a.web.NotifyParentWindowPositionChanged()
-	})
-
-	if err := a.web.Navigate(uiURL); err != nil {
-		a.log("WARN: не удалось открыть UI страницу: %v", err)
-		showMainWindow(false)
-	}
-
-	go func() {
-		time.Sleep(3 * time.Second)
-		if a.mw == nil {
-			return
-		}
-		a.mw.Synchronize(func() {
-			showMainWindow(false)
-		})
-	}()
 
 	if a.protoRegWarn != "" {
 		a.log("WARN: не удалось зарегистрировать протокол sing-box://: %s", a.protoRegWarn)
@@ -147,18 +133,89 @@ func (a *App) runUI() error {
 	a.startPowerResumeWatcher()
 	a.startCoreOnStartupIfEnabled()
 
-	a.mw.Closing().Attach(func(canceled *bool, reason walk.CloseReason) {
-		a.setCoreDesiredRunning(false)
-		a.stopAutoUpdateScheduler()
-		a.stopSystemThemeWatcher()
-		a.stopPowerResumeWatcher()
-		a.stopUIServer()
-		a.stopProcess()
-		a.disposeNotifyIcon()
+	if a.web != nil {
+		if err := a.web.Run(); err != nil {
+			a.debugf("ui: web.Run returned error: %v", err)
+			return err
+		}
+		a.debugf("ui: web.Run exited closeRequested=%v", a.isUICloseRequested())
+	}
+	return nil
+}
+
+func (a *App) shutdownUI() {
+	a.debugf("ui: shutdown started")
+	a.setCoreDesiredRunning(false)
+	a.stopAutoUpdateScheduler()
+	a.stopSystemThemeWatcher()
+	a.stopPowerResumeWatcher()
+	a.stopProcess()
+	a.disposeNotifyIcon()
+	a.disposeTrayOwnerWindow()
+
+	if a.web != nil {
+		a.web.Destroy()
+		a.web = nil
+	}
+	a.webHwnd = 0
+	a.debugf("ui: shutdown finished")
+}
+
+func (a *App) mainWindowHandle() win.HWND {
+	if a.web != nil {
+		if hwnd := a.web.HWND(); hwnd != 0 {
+			a.webHwnd = hwnd
+			return a.webHwnd
+		}
+	}
+	return a.webHwnd
+}
+
+func (a *App) hideMainWindow() {
+	hwnd := a.mainWindowHandle()
+	if hwnd == 0 {
+		return
+	}
+	win.ShowWindow(hwnd, win.SW_HIDE)
+}
+
+func (a *App) dispatchOnUIThreadSync(fn func()) bool {
+	if fn == nil {
+		return true
+	}
+	if a.web == nil {
+		fn()
+		return true
+	}
+
+	done := make(chan struct{})
+	a.web.Dispatch(func() {
+		fn()
+		close(done)
 	})
 
-	a.mw.Run()
-	return nil
+	select {
+	case <-done:
+		return true
+	case <-time.After(2 * time.Second):
+		return false
+	}
+}
+
+func (a *App) requestMainWindowClose() {
+	a.setUICloseRequested(true)
+	a.debugf("ui: close requested")
+
+	if a.web == nil {
+		return
+	}
+
+	a.web.Dispatch(func() {
+		if hwnd := a.mainWindowHandle(); hwnd != 0 {
+			_ = win.PostMessage(hwnd, win.WM_CLOSE, 0, 0)
+		}
+		a.web.Terminate()
+	})
 }
 
 func (a *App) tryOpenExternalURL(rawTarget string) bool {
@@ -187,29 +244,96 @@ func (a *App) shouldOpenInSystemBrowser(rawTarget string) bool {
 		return false
 	}
 
-	if baseURL, err := url.Parse(strings.TrimSpace(a.uiBaseURL)); err == nil && baseURL.IsAbs() {
-		if strings.EqualFold(targetURL.Scheme, baseURL.Scheme) && strings.EqualFold(targetURL.Host, baseURL.Host) {
-			return false
-		}
-	}
-
 	return true
 }
 
 func (a *App) applyMainWindowIcon() {
-	if a.mw == nil {
+	hwnd := a.mainWindowHandle()
+	if hwnd == 0 {
 		return
 	}
 
-	icon := a.loadMainWindowIcon()
-	if icon == nil {
+	big := loadMainHICON(int32(win.GetSystemMetrics(win.SM_CXICON)), true)
+	small := loadMainHICON(int32(win.GetSystemMetrics(win.SM_CXSMICON)), false)
+
+	// Reuse whichever icon was loaded successfully.
+	if big == 0 {
+		big = small
+	}
+	if small == 0 {
+		small = big
+	}
+
+	if big == 0 && small == 0 {
 		a.log("WARN: не удалось применить иконку окна")
 		return
 	}
 
-	if err := a.mw.SetIcon(icon); err != nil {
-		a.log("WARN: не удалось установить иконку окна")
+	setWindowIcons(hwnd, big, small)
+	if root := win.GetAncestor(hwnd, win.GA_ROOT); root != 0 && root != hwnd {
+		setWindowIcons(root, big, small)
 	}
+	if owner := win.GetAncestor(hwnd, win.GA_ROOTOWNER); owner != 0 && owner != hwnd {
+		setWindowIcons(owner, big, small)
+	}
+}
+
+func setWindowIcons(hwnd win.HWND, big, small win.HICON) {
+	if hwnd == 0 {
+		return
+	}
+	if big != 0 {
+		win.SendMessage(hwnd, win.WM_SETICON, 1, uintptr(big))
+	}
+	if small != 0 {
+		win.SendMessage(hwnd, win.WM_SETICON, 0, uintptr(small))
+	}
+}
+
+func loadMainHICON(size int32, preferLarge bool) win.HICON {
+	if size <= 0 {
+		if preferLarge {
+			size = int32(win.GetSystemMetrics(win.SM_CXICON))
+		} else {
+			size = int32(win.GetSystemMetrics(win.SM_CXSMICON))
+		}
+	}
+
+	// 1) Try embedded EXE icon resource first.
+	if hinstance := win.GetModuleHandle(nil); hinstance != 0 {
+		if h := win.HICON(win.LoadImage(
+			hinstance,
+			win.MAKEINTRESOURCE(1),
+			win.IMAGE_ICON,
+			size,
+			size,
+			win.LR_DEFAULTCOLOR|win.LR_DEFAULTSIZE|win.LR_SHARED,
+		)); h != 0 {
+			return h
+		}
+	}
+
+	// 2) Fallback to icon extracted from executable file path.
+	if exePath, err := os.Executable(); err == nil && strings.TrimSpace(exePath) != "" {
+		if real, realErr := filepath.EvalSymlinks(exePath); realErr == nil && strings.TrimSpace(real) != "" {
+			exePath = real
+		}
+		if ptr, convErr := syscall.UTF16PtrFromString(exePath); convErr == nil {
+			if h := win.HICON(win.LoadImage(
+				0,
+				ptr,
+				win.IMAGE_ICON,
+				size,
+				size,
+				win.LR_LOADFROMFILE|win.LR_DEFAULTSIZE,
+			)); h != 0 {
+				return h
+			}
+		}
+	}
+
+	// 3) Always available system icon to avoid empty title-bar icon.
+	return win.LoadIcon(0, win.MAKEINTRESOURCE(win.IDI_APPLICATION))
 }
 
 func (a *App) loadMainWindowIcon() *walk.Icon {
@@ -229,13 +353,13 @@ func (a *App) loadMainWindowIcon() *walk.Icon {
 	if icon, err := walk.NewIconFromResource("APPICON"); err == nil && icon != nil {
 		return icon
 	}
-	return nil
+	return walk.IconApplication()
 }
 
 func (a *App) applyNativeDarkHints(dark bool) {
 	setPreferredAppTheme(dark)
-	if a.mw != nil {
-		applyWindowTheme(a.mw.Handle(), dark)
+	if hwnd := a.mainWindowHandle(); hwnd != 0 {
+		applyWindowTheme(hwnd, dark)
 	}
 }
 
@@ -344,15 +468,45 @@ func allowDarkModeForWindow(hwnd win.HWND, dark bool) {
 	_, _, _ = procAllowDarkModeWindow.Call(uintptr(hwnd), enabled)
 }
 
+func (a *App) ensureTrayOwnerWindow() error {
+	if a.trayOwner != nil {
+		return nil
+	}
+
+	owner, err := walk.NewMainWindowWithName("singbox-gui-tray-owner")
+	if err != nil {
+		return err
+	}
+	owner.SetVisible(false)
+
+	layout := walk.NewVBoxLayout()
+	layout.SetMargins(walk.Margins{})
+	layout.SetSpacing(0)
+	if err := owner.SetLayout(layout); err != nil {
+		owner.Dispose()
+		return err
+	}
+	if err := owner.SetTitle("Sing-box GUI"); err != nil {
+		owner.Dispose()
+		return err
+	}
+	owner.Closing().Attach(func(canceled *bool, reason walk.CloseReason) {
+		a.setUICloseRequested(true)
+		a.debugf("ui: tray owner closing reason=%v", reason)
+	})
+	a.trayOwner = owner
+	return nil
+}
+
 func (a *App) initNotifyIcon() error {
-	if a.mw == nil {
+	if a.trayOwner == nil {
 		return nil
 	}
 	if a.ni != nil {
 		return nil
 	}
 
-	ni, err := walk.NewNotifyIcon(a.mw)
+	ni, err := walk.NewNotifyIcon(a.trayOwner)
 	if err != nil {
 		return err
 	}
@@ -374,9 +528,7 @@ func (a *App) initNotifyIcon() error {
 	exitAction := walk.NewAction()
 	_ = exitAction.SetText("Выход")
 	exitAction.Triggered().Attach(func() {
-		if a.mw != nil {
-			_ = a.mw.Close()
-		}
+		a.requestMainWindowClose()
 	})
 
 	_ = ni.ContextMenu().Actions().Add(showAction)
@@ -401,20 +553,35 @@ func (a *App) disposeNotifyIcon() {
 	a.ni = nil
 }
 
-func (a *App) showMainWindowFromTray() {
-	if a.mw == nil {
+func (a *App) disposeTrayOwnerWindow() {
+	if a.trayOwner == nil {
 		return
 	}
-	a.mw.Show()
-	a.mw.BringToTop()
+	a.trayOwner.Dispose()
+	a.trayOwner = nil
+}
+
+func (a *App) showMainWindowFromTray() {
+	// Ensure icon remains attached to the top-level host window.
+	a.applyMainWindowIcon()
+
+	hwnd := a.mainWindowHandle()
+	if hwnd == 0 {
+		return
+	}
+	win.ShowWindow(hwnd, win.SW_RESTORE)
+	win.ShowWindow(hwnd, win.SW_SHOW)
+	win.BringWindowToTop(hwnd)
+	win.SetForegroundWindow(hwnd)
 }
 
 func (a *App) toggleMainWindowVisibilityFromTray() {
-	if a.mw == nil {
+	hwnd := a.mainWindowHandle()
+	if hwnd == 0 {
 		return
 	}
-	if a.mw.Visible() {
-		a.mw.Hide()
+	if win.IsWindowVisible(hwnd) {
+		a.hideMainWindow()
 		return
 	}
 	a.showMainWindowFromTray()

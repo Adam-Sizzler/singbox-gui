@@ -165,12 +165,10 @@ func (a *App) copyLogsToClipboard() error {
 	}
 
 	var copyErr error
-	if a.mw != nil {
-		a.mw.Synchronize(func() {
-			copyErr = walk.Clipboard().SetText(text)
-		})
-	} else {
+	if !a.dispatchOnUIThreadSync(func() {
 		copyErr = walk.Clipboard().SetText(text)
+	}) {
+		copyErr = errors.New("ui thread is not available")
 	}
 	if copyErr != nil {
 		return copyErr
