@@ -116,7 +116,7 @@ func (a *App) runAutoUpdateOnce() {
 	runtimeCfgPath := a.runtimeConfigPathForProfile(profileName)
 	runtimeCfgFile := filepath.Base(runtimeCfgPath)
 
-	resolvedConfigURL, _, err := resolveSubscriptionInput(active.URL)
+	resolvedConfigURL, _, _, err := resolveSubscriptionInput(active.URL)
 	if err != nil {
 		a.log("WARN: автообновление профиля %s пропущено: %v", profileName, err)
 		return

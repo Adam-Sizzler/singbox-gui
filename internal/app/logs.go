@@ -4,6 +4,7 @@ package app
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -22,15 +23,51 @@ var logLineBreakReplacer = strings.NewReplacer(
 )
 
 func (a *App) pipeLogs(r io.Reader) {
-	scanner := bufio.NewScanner(r)
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
+	const maxLogLineBytes = 256 * 1024
+	reader := bufio.NewReaderSize(r, 64*1024)
+	var lineBuf bytes.Buffer
+	truncated := false
 
-	for scanner.Scan() {
-		a.appendLogLine(scanner.Text())
+	flushLine := func() {
+		if lineBuf.Len() == 0 && !truncated {
+			return
+		}
+		line := lineBuf.String()
+		if truncated {
+			line += " [truncated]"
+		}
+		a.appendLogLine(line)
+		lineBuf.Reset()
+		truncated = false
 	}
-	if err := scanner.Err(); err != nil {
-		a.log("log read error: %v", err)
+
+	for {
+		part, isPrefix, err := reader.ReadLine()
+		if len(part) > 0 {
+			if lineBuf.Len() < maxLogLineBytes {
+				remaining := maxLogLineBytes - lineBuf.Len()
+				if len(part) > remaining {
+					_, _ = lineBuf.Write(part[:remaining])
+					truncated = true
+				} else {
+					_, _ = lineBuf.Write(part)
+				}
+			} else {
+				truncated = true
+			}
+		}
+		if !isPrefix {
+			flushLine()
+		}
+
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				flushLine()
+				return
+			}
+			a.log("log read error: %v", err)
+			return
+		}
 	}
 }
 

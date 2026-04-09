@@ -99,6 +99,7 @@
   var STATE_POLL_MS = 1500;
   var LOGS_POLL_MS = 400;
   var MAX_RENDERED_LOG_LINES = 2000;
+  var MAX_FILTER_PATTERN_LEN = 256;
 
   var I18N = {
     ru: {
@@ -119,6 +120,7 @@
       copyLogs: "Копировать логи",
       logsFilterPlaceholder: "Фильтр RegExp",
       logsFilterInvalid: "Некорректный RegExp",
+      logsFilterTooLong: "Слишком длинный RegExp",
       actionsMenu: "Действия",
       statusBusy: "Выполняется операция...",
       statusConfigOk: "Конфигурация валидна",
@@ -155,6 +157,7 @@
       copyLogs: "Copy Logs",
       logsFilterPlaceholder: "RegExp filter",
       logsFilterInvalid: "Invalid RegExp",
+      logsFilterTooLong: "RegExp is too long",
       actionsMenu: "Actions",
       statusBusy: "Operation in progress...",
       statusConfigOk: "Configuration is valid",
@@ -1124,8 +1127,16 @@
 
   function trimLogBuffer() {
     var overflow = logBuffer.length - MAX_RENDERED_LOG_LINES;
-    if (overflow > 0) {
-      logBuffer.splice(0, overflow);
+    if (overflow <= 0) return [];
+    return logBuffer.splice(0, overflow);
+  }
+
+  function removeRenderedLogLines(count) {
+    if (!logsNode || count <= 0) return;
+    var remaining = count;
+    while (remaining > 0 && logsNode.firstChild) {
+      logsNode.removeChild(logsNode.firstChild);
+      remaining--;
     }
   }
 
@@ -1155,6 +1166,9 @@
     var pattern = String(rawPattern || "").trim();
     if (!pattern) {
       return { regex: null, highlightRegex: null, error: "" };
+    }
+    if (pattern.length > MAX_FILTER_PATTERN_LEN) {
+      return { regex: null, highlightRegex: null, error: tr("logsFilterTooLong") + " (>" + MAX_FILTER_PATTERN_LEN + ")" };
     }
 
     var source = pattern;
@@ -1247,9 +1261,37 @@
     }
     if (!normalized.length) return;
 
-    trimLogBuffer();
+    var removedEntries = trimLogBuffer();
     if (logsFilterRegex) {
-      rebuildRenderedLogs();
+      var stickFiltered = logsNode.scrollTop + logsNode.clientHeight >= logsNode.scrollHeight - 4;
+      var prevFilteredScrollTop = logsNode.scrollTop;
+      var prevFilteredScrollHeight = logsNode.scrollHeight;
+
+      var removedMatched = 0;
+      for (var k = 0; k < removedEntries.length; k++) {
+        if (logsFilterMatches(removedEntries[k].text || "")) {
+          removedMatched++;
+        }
+      }
+      if (removedMatched > 0) {
+        removeRenderedLogLines(removedMatched);
+      }
+
+      var filteredFrag = document.createDocumentFragment();
+      for (var m = 0; m < normalized.length; m++) {
+        if (!logsFilterMatches(normalized[m].text)) continue;
+        filteredFrag.appendChild(buildLogLineNode(normalized[m].text));
+      }
+      logsNode.appendChild(filteredFrag);
+
+      if (stickFiltered) {
+        logsNode.scrollTop = logsNode.scrollHeight;
+        return;
+      }
+      var filteredDelta = logsNode.scrollHeight - prevFilteredScrollHeight;
+      if (filteredDelta !== 0) {
+        logsNode.scrollTop = Math.max(0, prevFilteredScrollTop + filteredDelta);
+      }
       return;
     }
 

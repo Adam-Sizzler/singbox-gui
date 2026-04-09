@@ -113,7 +113,7 @@ func validateConfig(cfg AppConfig) error {
 	if strings.TrimSpace(active.Version) == "" {
 		return errors.New("поле Version не заполнено")
 	}
-	if _, _, err := resolveSubscriptionInput(active.URL); err != nil {
+	if _, _, _, err := resolveSubscriptionInput(active.URL); err != nil {
 		return err
 	}
 	return nil
@@ -370,14 +370,14 @@ func applyImportURIToConfig(cfg *AppConfig, rawImport string) {
 		return
 	}
 
-	if resolvedURL, profileName, err := resolveSubscriptionInput(importURI); err == nil {
-		applyImportToConfig(cfg, resolvedURL, profileName)
+	if resolvedURL, profileName, coreVersion, err := resolveSubscriptionInput(importURI); err == nil {
+		applyImportToConfig(cfg, resolvedURL, profileName, coreVersion)
 		return
 	}
 	setActiveProfileURL(cfg, importURI)
 }
 
-func applyImportToConfig(cfg *AppConfig, resolvedURL, profileName string) {
+func applyImportToConfig(cfg *AppConfig, resolvedURL, profileName, coreVersion string) {
 	if cfg == nil {
 		return
 	}
@@ -388,7 +388,7 @@ func applyImportToConfig(cfg *AppConfig, resolvedURL, profileName string) {
 	}
 
 	resolvedURL = strings.TrimSpace(strings.Trim(resolvedURL, `"'`))
-	cfg.Profiles[idx].URL = resolvedURL
+	resolvedCoreVersion := normalizeImportedCoreVersion(coreVersion)
 
 	name := sanitizeProfileName(profileName)
 	if name == "" {
@@ -397,66 +397,83 @@ func applyImportToConfig(cfg *AppConfig, resolvedURL, profileName string) {
 
 	target := findProfileIndexByName(cfg.Profiles, name)
 	if target < 0 {
-		baseVersion := strings.TrimSpace(cfg.Profiles[idx].Version)
-		if baseVersion == "" {
-			baseVersion = "latest"
-		}
 		cfg.Profiles = append(cfg.Profiles, ConfigProfile{
 			Name:    name,
 			URL:     resolvedURL,
-			Version: baseVersion,
+			Version: resolvedCoreVersion,
 		})
 		target = len(cfg.Profiles) - 1
 	} else {
 		cfg.Profiles[target].URL = resolvedURL
+		cfg.Profiles[target].Version = resolvedCoreVersion
 	}
 	cfg.CurrentProfile = cfg.Profiles[target].Name
 	syncLegacyFromCurrent(cfg)
 }
 
-func resolveSubscriptionInput(raw string) (resolvedURL string, profileName string, err error) {
+func resolveSubscriptionInput(raw string) (resolvedURL string, profileName string, coreVersion string, err error) {
 	input := strings.TrimSpace(strings.Trim(raw, `"'`))
 	if input == "" {
-		return "", "", nil
+		return "", "", "", nil
 	}
 
 	parsed, err := url.Parse(input)
 	if err != nil {
-		return "", "", errors.New("поле URL имеет неверный формат")
+		return "", "", "", errors.New("поле URL имеет неверный формат")
 	}
 
 	switch strings.ToLower(parsed.Scheme) {
 	case "http", "https":
 		u, err := url.ParseRequestURI(input)
 		if err != nil {
-			return "", "", errors.New("поле URL имеет неверный формат")
+			return "", "", "", errors.New("поле URL имеет неверный формат")
 		}
 		if u.Scheme != "http" && u.Scheme != "https" {
-			return "", "", errors.New("поле URL должно начинаться с http:// или https://")
+			return "", "", "", errors.New("поле URL должно начинаться с http:// или https://")
 		}
-		return input, "", nil
+		return input, "", "", nil
 
 	case "sing-box":
 		if !strings.EqualFold(parsed.Host, "import-remote-profile") {
-			return "", "", errors.New("поддерживается только sing-box://import-remote-profile")
+			return "", "", "", errors.New("поддерживается только sing-box://import-remote-profile")
 		}
 		remoteURL := strings.TrimSpace(parsed.Query().Get("url"))
 		if remoteURL == "" {
-			return "", "", errors.New("в import-ссылке не найден параметр url")
+			return "", "", "", errors.New("в import-ссылке не найден параметр url")
 		}
 		remoteParsed, err := url.ParseRequestURI(remoteURL)
 		if err != nil || (remoteParsed.Scheme != "http" && remoteParsed.Scheme != "https") {
-			return "", "", errors.New("параметр url в import-ссылке должен быть http:// или https://")
+			return "", "", "", errors.New("параметр url в import-ссылке должен быть http:// или https://")
 		}
 		name := strings.TrimSpace(parsed.Fragment)
 		if decoded, err := url.QueryUnescape(name); err == nil {
 			name = strings.TrimSpace(decoded)
 		}
-		return remoteURL, name, nil
+		version := strings.TrimSpace(parsed.Query().Get("version"))
+		return remoteURL, name, version, nil
 
 	default:
-		return "", "", errors.New("поле URL должно быть http(s) или sing-box://import-remote-profile?...")
+		return "", "", "", errors.New("поле URL должно быть http(s) или sing-box://import-remote-profile?...")
 	}
+}
+
+func normalizeImportedCoreVersion(raw string) string {
+	v := strings.TrimSpace(raw)
+	if v == "" || strings.EqualFold(v, "latest") {
+		return "latest"
+	}
+	if len(v) > 0 {
+		if v[0] == 'v' || v[0] == 'V' {
+			v = strings.TrimSpace(v[1:])
+		}
+	}
+	if v == "" || strings.EqualFold(v, "latest") {
+		return "latest"
+	}
+	if semverRegex.FindString(v) != v {
+		return "latest"
+	}
+	return v
 }
 
 func findImportURIArg(args []string) string {
