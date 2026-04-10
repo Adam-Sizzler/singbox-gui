@@ -29,67 +29,100 @@ func Run(args []string) {
 		return
 	}
 
-	startupImport := findImportURIArg(args)
-	if notifyRunningInstance(workDir, startupImport) {
-		return
+	app := newApp(workDir)
+	app.debugf("================================================================================")
+	app.debugf("startup: launch pid=%d startedAt=%s", os.Getpid(), time.Now().Format(time.RFC3339Nano))
+	startupStepN := 0
+	startupStep := func(format string, args ...any) {
+		startupStepN++
+		app.debugf("startup[%02d]: %s", startupStepN, fmt.Sprintf(format, args...))
 	}
 
+	startupStep("args=%q", args)
+	startupStep("workDir=%s", workDir)
+
+	startupImport := findImportURIArg(args)
+	startupStep("startupImport=%q", startupImport)
+	app.startupImport = startupImport
+
+	startupStep("probing running instance")
+	if notifyRunningInstance(workDir, startupImport) {
+		startupStep("activation sent to existing instance; exiting current process")
+		return
+	}
+	startupStep("no running instance handled activation")
+
+	startupStep("checking administrator privileges")
 	if !isRunningAsAdmin() {
+		startupStep("administrator privileges are missing")
 		showError("Admin rights required", "Приложение должно быть запущено с правами администратора.")
 		return
 	}
+	startupStep("administrator privileges confirmed")
 
-	app := newApp(workDir)
-	app.startupImport = startupImport
-	app.debugf("startup: args=%q", args)
-	app.debugf("startup: workDir=%s", workDir)
-	app.debugf("startup: startupImport=%q", startupImport)
-
+	startupStep("registering sing-box URI protocol handler")
 	if err := ensureSingBoxProtocolRegistration(); err != nil {
 		app.protoRegWarn = err.Error()
-		app.debugf("startup: protocol registration warning: %v", err)
+		startupStep("protocol registration warning: %v", err)
+	} else {
+		startupStep("protocol registration completed")
 	}
 
+	startupStep("loading config: %s", app.configPath)
 	cfg, err := loadOrCreateConfig(app.configPath)
 	if err != nil {
+		startupStep("failed to load config: %v", err)
 		showError("Config error", "Не удалось прочитать config.yaml:\n"+err.Error())
 		return
 	}
 	normalizeConfigProfiles(&cfg)
 	applyImportURIToConfig(&cfg, app.startupImport)
+	startupStep("config loaded: profiles=%d current=%q", len(cfg.Profiles), cfg.CurrentProfile)
+
+	startupStep("saving normalized config")
 	if err := saveConfig(app.configPath, cfg); err != nil {
+		startupStep("failed to save config: %v", err)
 		showError("Config error", "Не удалось сохранить config.yaml:\n"+err.Error())
 		return
 	}
 	app.setConfig(cfg)
+	startupStep("config saved and applied")
 
+	startupStep("starting instance IPC listener")
 	if err := app.startInstanceIPC(); err != nil {
-		app.debugf("startup: failed to start instance IPC: %v", err)
+		startupStep("failed to start instance IPC: %v", err)
 		if errors.Is(err, errInstanceAlreadyRunning) {
 			if notifyRunningInstance(workDir, app.startupImport) {
-				app.debugf("startup: existing instance accepted activation, exiting")
+				startupStep("existing instance accepted activation after IPC conflict; exiting")
 			} else {
-				app.debugf("startup: existing instance detected, activation signal failed")
+				startupStep("existing instance detected, activation signal failed")
 			}
 			return
 		}
 		app.log("WARN: не удалось запустить instance IPC: %v", err)
+	} else {
+		startupStep("instance IPC listener started")
 	}
-	defer app.stopInstanceIPC()
+	defer func() {
+		startupStep("stopping instance IPC listener")
+		app.stopInstanceIPC()
+	}()
 
+	startupStep("starting UI loop")
 	if err := app.runUI(); err != nil {
+		startupStep("UI loop returned error: %v", err)
 		app.debugf("fatal: runUI returned error: %v", err)
-		showError("UI error", err.Error()+"\n\nDebug log:\n"+app.debugLogPath)
+		showError("UI error", err.Error())
+		return
 	}
+	startupStep("UI loop finished without error")
 }
 
 func newApp(workDir string) *App {
-	debugPath := filepath.Join(workDir, "singbox-gui-debug.log")
 	return &App{
-		workDir:      workDir,
-		configPath:   filepath.Join(workDir, configFileName),
-		singBoxPath:  filepath.Join(workDir, singboxExeName),
-		debugLogPath: debugPath,
-		logEntries:   make([]logEntry, 0, maxLogLines),
+		workDir:     workDir,
+		configPath:  filepath.Join(workDir, configFileName),
+		singBoxPath: filepath.Join(workDir, singboxExeName),
+		logEntries:  make([]logEntry, 0, maxLogLines),
 	}
 }

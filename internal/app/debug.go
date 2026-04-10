@@ -2,36 +2,11 @@
 
 package app
 
-import (
-	"fmt"
-	"os"
-	"strings"
-	"time"
-)
-
 func (a *App) debugf(format string, args ...any) {
-	if a == nil {
-		return
-	}
-	msg := strings.TrimSpace(fmt.Sprintf(format, args...))
-	if msg == "" {
-		return
-	}
-	line := fmt.Sprintf("[%s] %s\n", time.Now().Format("2006-01-02 15:04:05.000"), msg)
-
-	a.debugMu.Lock()
-	defer a.debugMu.Unlock()
-
-	path := strings.TrimSpace(a.debugLogPath)
-	if path == "" {
-		return
-	}
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	_, _ = f.WriteString(line)
+	_ = a
+	_ = format
+	_ = args
+	// Debug file logging is disabled in production builds.
 }
 
 func (a *App) setUICloseRequested(v bool) {

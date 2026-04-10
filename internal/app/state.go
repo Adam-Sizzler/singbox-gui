@@ -50,7 +50,6 @@ type App struct {
 	workDir       string
 	configPath    string
 	singBoxPath   string
-	debugLogPath  string
 	startupImport string
 	protoRegWarn  string
 
@@ -84,10 +83,19 @@ type App struct {
 	instanceStop  chan struct{}
 	instanceDone  chan struct{}
 
-	trayOwner *walk.MainWindow
-	web       *webViewHost
-	webHwnd   win.HWND
-	ni        *walk.NotifyIcon
+	trayOwner           *walk.MainWindow
+	web                 *webViewHost
+	webHwnd             win.HWND
+	webWidget           win.HWND
+	windowRectMu        sync.Mutex
+	lastWindowRect      win.RECT
+	lastWindowRectOk    bool
+	lastWindowMaximized bool
+	lastLiveResizeSync  time.Time
+	embedSyncMu         sync.Mutex
+	embedSyncTimer      *time.Timer
+	embedSyncTag        string
+	ni                  *walk.NotifyIcon
 
 	autoUpdateMu   sync.Mutex
 	autoUpdateStop chan struct{}
@@ -293,9 +301,6 @@ func (a *App) createProfile(name string) error {
 func (a *App) deleteProfile(name string) error {
 	cfg := a.getConfigSnapshot()
 	normalizeConfigProfiles(&cfg)
-	if len(cfg.Profiles) <= 1 {
-		return errors.New("нельзя удалить последний профиль")
-	}
 
 	target := sanitizeProfileName(name)
 	if target == "" {
@@ -306,10 +311,21 @@ func (a *App) deleteProfile(name string) error {
 		return fmt.Errorf("профиль %q не найден", target)
 	}
 
-	cfg.Profiles = append(cfg.Profiles[:idx], cfg.Profiles[idx+1:]...)
-	if len(cfg.Profiles) == 0 {
-		cfg = defaultAppConfig()
+	// If the last profile is being deleted, reset profile storage to a clean base state.
+	if len(cfg.Profiles) <= 1 {
+		cfg.Profiles = []ConfigProfile{
+			{
+				Name:    "default",
+				URL:     "",
+				Version: "latest",
+			},
+		}
+		cfg.CurrentProfile = "default"
+		syncLegacyFromCurrent(&cfg)
+		return a.persistConfig(cfg)
 	}
+
+	cfg.Profiles = append(cfg.Profiles[:idx], cfg.Profiles[idx+1:]...)
 	if findProfileIndexByName(cfg.Profiles, cfg.CurrentProfile) < 0 {
 		cfg.CurrentProfile = cfg.Profiles[0].Name
 	}
