@@ -188,8 +188,8 @@ func (a *App) focusMainWindow() {
 	})
 }
 
-func notifyRunningInstance(workDir, importURI string) bool {
-	payloadPath := instancePayloadPath(workDir)
+func notifyRunningInstance(importURI string) bool {
+	payloadPath := instancePayloadPath()
 	payload := instanceActivateRequest{ImportURI: strings.TrimSpace(importURI)}
 	if err := writeInstanceActivateRequest(payloadPath, payload); err != nil {
 		return false
@@ -214,13 +214,12 @@ func notifyRunningInstance(workDir, importURI string) bool {
 	return true
 }
 
-func instancePayloadPath(workDir string) string {
-	_ = workDir
+func instancePayloadPath() string {
 	return filepath.Join(os.TempDir(), instancePayloadFile)
 }
 
 func (a *App) instancePayloadPath() string {
-	return instancePayloadPath(a.workDir)
+	return instancePayloadPath()
 }
 
 func writeInstanceActivateRequest(path string, req instanceActivateRequest) error {

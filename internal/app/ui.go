@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -31,9 +30,6 @@ var (
 	procSetWindowCompAttr = user32DLL.NewProc("SetWindowCompositionAttribute")
 	procSetClassLongPtrW  = user32DLL.NewProc("SetClassLongPtrW")
 	procSetClassLongW     = user32DLL.NewProc("SetClassLongW")
-	procEnumWindows       = user32DLL.NewProc("EnumWindows")
-	procGetWindowTextW    = user32DLL.NewProc("GetWindowTextW")
-	procGetWindowTextLenW = user32DLL.NewProc("GetWindowTextLengthW")
 	procIsWindow          = user32DLL.NewProc("IsWindow")
 )
 
@@ -56,7 +52,6 @@ type windowCompositionAttribData struct {
 func (a *App) runUI() error {
 	a.setUICloseRequested(false)
 	a.debugf("ui: runUI started")
-	a.debugDumpProcessWindows("runUI-enter")
 
 	a.systemDark = detectSystemDarkTheme()
 	setPreferredAppTheme(a.systemDark)
@@ -76,7 +71,6 @@ func (a *App) runUI() error {
 		return err
 	}
 	a.debugf("ui: tray owner hwnd=%#x", uintptr(a.trayOwner.Handle()))
-	a.debugDumpProcessWindows("after-tray-owner")
 
 	uiReadyNotified := make(chan struct{})
 	var showMainWindowOnce sync.Once
@@ -112,7 +106,6 @@ func (a *App) runUI() error {
 			_ = a.tryOpenExternalURL(target)
 		},
 		nil,
-		nil,
 	)
 	if err != nil {
 		a.debugf("ui: newWebViewHost failed: %v", err)
@@ -126,9 +119,6 @@ func (a *App) runUI() error {
 		return syscall.EINVAL
 	}
 	a.debugf("ui: web host initialized")
-	a.debugDumpWindowState("web-host-initial", a.webHwnd)
-	a.debugDumpProcessWindows("after-web-host")
-	a.debugDumpChildWindowsDetailed("after-web-host", a.mainWindowHandle())
 	a.syncEmbeddedWebViewWidgetBounds("after-web-host")
 
 	if err := a.bindUIBridge(); err != nil {
@@ -149,7 +139,6 @@ func (a *App) runUI() error {
 		a.debugf("ui: SetSize min failed: %v", err)
 		return err
 	}
-	a.debugDumpWindowState("after-size", a.webHwnd)
 	a.syncEmbeddedWebViewWidgetBounds("after-size")
 
 	a.applyMainWindowIcon()
@@ -166,9 +155,6 @@ func (a *App) runUI() error {
 		return err
 	}
 	a.debugf("ui: SetHTML completed")
-	a.debugDumpWindowState("after-sethtml", a.webHwnd)
-	a.debugDumpProcessWindows("after-sethtml")
-	a.debugDumpChildWindowsDetailed("after-sethtml", a.mainWindowHandle())
 	a.syncEmbeddedWebViewWidgetBounds("after-sethtml")
 	a.scheduleEmbeddedWidgetSync("post-sethtml")
 
@@ -252,9 +238,7 @@ func (a *App) hideMainWindow() {
 	}
 	a.rememberMainWindowRect("hideMainWindow")
 	a.debugf("ui: hideMainWindow hwnd=%#x", uintptr(hwnd))
-	a.debugDumpWindowState("hideMainWindow-before", hwnd)
 	win.ShowWindow(hwnd, win.SW_HIDE)
-	a.debugDumpWindowState("hideMainWindow-after", hwnd)
 }
 
 func (a *App) rememberMainWindowRect(tag string) {
@@ -364,90 +348,6 @@ func (a *App) restoreMainWindowRect(tag string) {
 		height,
 		maximized,
 	)
-}
-
-func (a *App) debugLogWebViewEvent(raw string) {
-	payload := strings.TrimSpace(raw)
-	if payload == "" {
-		return
-	}
-	const maxPayloadLen = 3500
-	if len(payload) > maxPayloadLen {
-		payload = payload[:maxPayloadLen] + "...(truncated)"
-	}
-	a.debugf("webview: js-debug %s", payload)
-}
-
-func (a *App) scheduleWebViewProbe(tag string, delay time.Duration) {
-	if strings.TrimSpace(tag) == "" {
-		tag = "probe"
-	}
-	if delay < 0 {
-		delay = 0
-	}
-	go func() {
-		if delay > 0 {
-			time.Sleep(delay)
-		}
-		if !a.dispatchOnUIThreadSync(func() {
-			a.emitWebViewProbe(tag)
-		}) {
-			a.debugf("ui: web probe skipped tag=%q: UI thread unavailable", tag)
-		}
-	}()
-}
-
-func (a *App) emitWebViewProbe(tag string) {
-	if a.web == nil {
-		a.debugf("ui: web probe skipped tag=%q: webview is nil", tag)
-		return
-	}
-	snippet := fmt.Sprintf(`(function(){
-  try {
-    if (typeof window.__sbDebug !== "function") return;
-    var body = document.body;
-    var app = document.querySelector(".app");
-    var bodyStyle = body && window.getComputedStyle ? window.getComputedStyle(body) : null;
-    var appStyle = app && window.getComputedStyle ? window.getComputedStyle(app) : null;
-    window.__sbDebug(JSON.stringify({
-      kind: "go-probe",
-      details: {
-        tag: %q,
-        readyState: String(document.readyState || ""),
-        bodyClass: body ? String(body.className || "") : "",
-        bodyBackground: bodyStyle ? String(bodyStyle.backgroundColor || "") : "",
-        appExists: !!app,
-        appDisplay: appStyle ? String(appStyle.display || "") : "",
-        appVisibility: appStyle ? String(appStyle.visibility || "") : "",
-        appOpacity: appStyle ? String(appStyle.opacity || "") : "",
-        appClientWidth: app ? (app.clientWidth || 0) : 0,
-        appClientHeight: app ? (app.clientHeight || 0) : 0,
-        viewportWidth: window.innerWidth || 0,
-        viewportHeight: window.innerHeight || 0,
-        hasApiBridge: typeof window.__sbApiCall === "function"
-      },
-      href: String((window.location && window.location.href) || ""),
-      ts: Date.now()
-    }));
-  } catch (e) {
-    try {
-      if (typeof window.__sbDebug === "function") {
-        window.__sbDebug(JSON.stringify({
-          kind: "go-probe-error",
-          details: {
-            tag: %q,
-            message: String(e && e.message ? e.message : e)
-          },
-          href: String((window.location && window.location.href) || ""),
-          ts: Date.now()
-        }));
-      }
-    } catch (_) {}
-  }
-})();`, tag, tag)
-	if err := a.web.Eval(snippet); err != nil {
-		a.debugf("ui: web probe eval failed tag=%q err=%v", tag, err)
-	}
 }
 
 func (a *App) stopEmbeddedWidgetSyncTimer() {
@@ -641,7 +541,7 @@ func (a *App) syncEmbeddedWebViewWidgetBounds(tag string) {
 }
 
 func (a *App) findEmbeddedWebViewWidget(main win.HWND) win.HWND {
-	if a.webWidget != 0 && isWindowHandleValid(a.webWidget) && strings.EqualFold(debugWindowClassName(a.webWidget), "webview_widget") {
+	if a.webWidget != 0 && isWindowHandleValid(a.webWidget) && strings.EqualFold(windowClassName(a.webWidget), "webview_widget") {
 		return a.webWidget
 	}
 	a.webWidget = 0
@@ -656,7 +556,7 @@ func (a *App) findEmbeddedWebViewWidget(main win.HWND) win.HWND {
 		if !isWindowHandleValid(h) {
 			return 1
 		}
-		if strings.EqualFold(debugWindowClassName(h), "webview_widget") {
+		if strings.EqualFold(windowClassName(h), "webview_widget") {
 			found = h
 			return 0
 		}
@@ -680,17 +580,21 @@ func (a *App) findEmbeddedContentHost(main win.HWND) win.HWND {
 
 	callback := syscall.NewCallback(func(hwnd uintptr, lParam uintptr) uintptr {
 		h := win.HWND(hwnd)
-		className := strings.ToLower(debugWindowClassName(h))
+		className := strings.ToLower(windowClassName(h))
 		if !strings.Contains(className, "walk_composite_class") {
 			return 1
 		}
 
-		info, ok := a.debugCollectWindowInfo(h)
-		if !ok {
+		if !isWindowHandleValid(h) {
 			return 1
 		}
-		width := int64(info.Rect.Right - info.Rect.Left)
-		height := int64(info.Rect.Bottom - info.Rect.Top)
+
+		var rect win.RECT
+		if !win.GetWindowRect(h, &rect) {
+			return 1
+		}
+		width := int64(rect.Right - rect.Left)
+		height := int64(rect.Bottom - rect.Top)
 		if width <= 0 || height <= 0 {
 			return 1
 		}
@@ -700,7 +604,7 @@ func (a *App) findEmbeddedContentHost(main win.HWND) win.HWND {
 			bestAnyArea = area
 			bestAny = h
 		}
-		if info.Visible && area > bestVisibleArea {
+		if win.IsWindowVisible(h) && area > bestVisibleArea {
 			bestVisibleArea = area
 			bestVisible = h
 		}
@@ -1238,15 +1142,12 @@ func (a *App) ensureTrayOwnerWindow() error {
 	owner.Closing().Attach(func(canceled *bool, reason walk.CloseReason) {
 		a.setUICloseRequested(true)
 		a.debugf("ui: tray owner closing reason=%v", reason)
-		a.debugDumpWindowState("tray-owner-closing", owner.Handle())
-		a.debugDumpProcessWindows("tray-owner-closing")
 		if a.web != nil {
 			a.web.Terminate()
 		}
 	})
 	owner.VisibleChanged().Attach(func() {
 		a.debugf("ui: tray owner visible changed visible=%v", owner.Visible())
-		a.debugDumpWindowState("tray-owner-visible-changed", owner.Handle())
 		if owner.Visible() {
 			a.syncEmbeddedWebViewWidgetBounds("tray-owner-visible")
 			a.scheduleEmbeddedWidgetSync("tray-owner-visible")
@@ -1271,7 +1172,6 @@ func (a *App) ensureTrayOwnerWindow() error {
 	})
 	a.trayOwner = owner
 	a.debugf("ui: tray owner created hwnd=%#x", uintptr(owner.Handle()))
-	a.debugDumpWindowState("tray-owner-created", owner.Handle())
 	return nil
 }
 
@@ -1348,7 +1248,6 @@ func (a *App) showMainWindowFromTray() {
 		return
 	}
 	a.debugf("ui: showMainWindowFromTray hwnd=%#x", uintptr(hwnd))
-	a.debugDumpWindowState("showMainWindowFromTray-before", hwnd)
 	win.ShowWindow(hwnd, win.SW_RESTORE)
 	a.restoreMainWindowRect("showMainWindowFromTray")
 	win.ShowWindow(hwnd, win.SW_SHOW)
@@ -1356,9 +1255,6 @@ func (a *App) showMainWindowFromTray() {
 	win.SetForegroundWindow(hwnd)
 	a.syncEmbeddedWebViewWidgetBounds("showMainWindowFromTray")
 	a.scheduleEmbeddedWidgetSync("showMainWindowFromTray")
-	a.debugDumpWindowState("showMainWindowFromTray-after", hwnd)
-	a.debugDumpProcessWindows("showMainWindowFromTray-after")
-	a.debugDumpChildWindowsDetailed("showMainWindowFromTray-after", hwnd)
 }
 
 func (a *App) toggleMainWindowVisibilityFromTray() {
@@ -1393,311 +1289,8 @@ func (a *App) startCoreOnStartupIfEnabled() {
 	}()
 }
 
-type windowDebugInfo struct {
-	HWND     win.HWND
-	Exists   bool
-	Visible  bool
-	Class    string
-	Title    string
-	Owner    win.HWND
-	Parent   win.HWND
-	Style    uint32
-	ExStyle  uint32
-	Rect     win.RECT
-	ProcID   uint32
-	ThreadID uint32
-}
-
-func (a *App) debugWindowTopologyMonitor(stop <-chan struct{}, duration time.Duration) {
-	if duration <= 0 {
-		return
-	}
-
-	ticker := time.NewTicker(150 * time.Millisecond)
-	defer ticker.Stop()
-
-	timeout := time.NewTimer(duration)
-	defer timeout.Stop()
-
-	lastSignature := ""
-	for {
-		select {
-		case <-stop:
-			return
-		case <-timeout.C:
-			return
-		case <-ticker.C:
-			windows := a.debugCollectProcessWindows()
-			signature := debugWindowsSignature(windows)
-			if signature == lastSignature {
-				continue
-			}
-			lastSignature = signature
-
-			a.debugf("ui: process windows topology changed count=%d", len(windows))
-			for i, info := range windows {
-				a.debugf("ui: process windows topology[%d] %s", i, a.debugFormatWindowInfo(info))
-			}
-		}
-	}
-}
-
-func (a *App) debugMainWindowLifetimeMonitor(stop <-chan struct{}, duration time.Duration) {
-	if duration <= 0 {
-		return
-	}
-
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	timeout := time.NewTimer(duration)
-	defer timeout.Stop()
-
-	var (
-		initialized   bool
-		lastMainState string
-		lastTrayState string
-	)
-
-	for {
-		select {
-		case <-stop:
-			return
-		case <-timeout.C:
-			return
-		case <-ticker.C:
-			mainHWND := a.mainWindowHandle()
-			mainInfo, mainExists := a.debugCollectWindowInfo(mainHWND)
-			mainChildren := a.debugCollectChildClassNames(mainHWND)
-			mainState := fmt.Sprintf(
-				"hwnd=%#x exists=%v visible=%v children=%q",
-				uintptr(mainHWND),
-				mainExists,
-				mainExists && mainInfo.Visible,
-				strings.Join(mainChildren, ","),
-			)
-
-			trayHWND := win.HWND(0)
-			if a.trayOwner != nil {
-				trayHWND = a.trayOwner.Handle()
-			}
-			trayInfo, trayExists := a.debugCollectWindowInfo(trayHWND)
-			trayChildren := a.debugCollectChildClassNames(trayHWND)
-			trayState := fmt.Sprintf(
-				"hwnd=%#x exists=%v visible=%v children=%q",
-				uintptr(trayHWND),
-				trayExists,
-				trayExists && trayInfo.Visible,
-				strings.Join(trayChildren, ","),
-			)
-
-			if initialized && mainState == lastMainState && trayState == lastTrayState {
-				continue
-			}
-			initialized = true
-			lastMainState = mainState
-			lastTrayState = trayState
-
-			a.debugf("ui: lifetime main=%s", mainState)
-			a.debugf("ui: lifetime tray=%s", trayState)
-			if !mainExists {
-				a.debugf("ui: lifetime detected missing main window")
-				a.debugDumpProcessWindows("lifetime-main-missing")
-			}
-		}
-	}
-}
-
-func (a *App) debugDumpProcessWindows(tag string) {
-	windows := a.debugCollectProcessWindows()
-	a.debugf("ui: process windows snapshot[%s]: count=%d", tag, len(windows))
-	for i, info := range windows {
-		a.debugf("ui: process windows snapshot[%s][%d] %s", tag, i, a.debugFormatWindowInfo(info))
-	}
-}
-
-func (a *App) debugDumpWindowState(tag string, hwnd win.HWND) {
-	info, ok := a.debugCollectWindowInfo(hwnd)
-	if !ok {
-		a.debugf("ui: window[%s]: hwnd=%#x exists=false", tag, uintptr(hwnd))
-		return
-	}
-	a.debugf("ui: window[%s]: %s", tag, a.debugFormatWindowInfo(info))
-}
-
-func (a *App) debugDumpChildWindowsDetailed(tag string, parent win.HWND) {
-	if parent == 0 || !isWindowHandleValid(parent) {
-		a.debugf("ui: child windows[%s]: parent=%#x unavailable", tag, uintptr(parent))
-		return
-	}
-
-	children := make([]windowDebugInfo, 0, 12)
-	callback := syscall.NewCallback(func(hwnd uintptr, lParam uintptr) uintptr {
-		if info, ok := a.debugCollectWindowInfo(win.HWND(hwnd)); ok {
-			children = append(children, info)
-		}
-		return 1
-	})
-	_ = win.EnumChildWindows(parent, callback, 0)
-	sort.Slice(children, func(i, j int) bool {
-		return uintptr(children[i].HWND) < uintptr(children[j].HWND)
-	})
-
-	a.debugf("ui: child windows[%s]: parent=%#x count=%d", tag, uintptr(parent), len(children))
-	for i, info := range children {
-		prev := win.GetWindow(info.HWND, win.GW_HWNDPREV)
-		next := win.GetWindow(info.HWND, win.GW_HWNDNEXT)
-		a.debugf(
-			"ui: child windows[%s][%d] %s zPrev=%#x zNext=%#x",
-			tag,
-			i,
-			a.debugFormatWindowInfo(info),
-			uintptr(prev),
-			uintptr(next),
-		)
-	}
-}
-
-func (a *App) debugCollectProcessWindows() []windowDebugInfo {
-	if !ensureWindowDebugProcsReady() {
-		return nil
-	}
-
-	targetPID := uint32(os.Getpid())
-	windows := make([]windowDebugInfo, 0, 8)
-
-	callback := syscall.NewCallback(func(hwnd uintptr, lParam uintptr) uintptr {
-		h := win.HWND(hwnd)
-		var pid uint32
-		tid := win.GetWindowThreadProcessId(h, &pid)
-		if pid != targetPID || tid == 0 {
-			return 1
-		}
-
-		if info, ok := a.debugCollectWindowInfo(h); ok {
-			windows = append(windows, info)
-		} else {
-			windows = append(windows, windowDebugInfo{
-				HWND:     h,
-				Exists:   false,
-				ProcID:   pid,
-				ThreadID: tid,
-			})
-		}
-		return 1
-	})
-
-	_, _, _ = procEnumWindows.Call(callback, 0)
-	sort.Slice(windows, func(i, j int) bool {
-		return uintptr(windows[i].HWND) < uintptr(windows[j].HWND)
-	})
-	return windows
-}
-
-func (a *App) debugCollectWindowInfo(hwnd win.HWND) (windowDebugInfo, bool) {
-	info := windowDebugInfo{HWND: hwnd}
-	if hwnd == 0 {
-		return info, false
-	}
-	if !isWindowHandleValid(hwnd) {
-		return info, false
-	}
-
-	var pid uint32
-	tid := win.GetWindowThreadProcessId(hwnd, &pid)
-	info.Exists = true
-	info.ProcID = pid
-	info.ThreadID = tid
-	info.Visible = win.IsWindowVisible(hwnd)
-	info.Owner = win.GetWindow(hwnd, win.GW_OWNER)
-	info.Parent = win.GetParent(hwnd)
-	info.Style = uint32(win.GetWindowLong(hwnd, win.GWL_STYLE))
-	info.ExStyle = uint32(win.GetWindowLong(hwnd, win.GWL_EXSTYLE))
-	_ = win.GetWindowRect(hwnd, &info.Rect)
-	info.Class = debugWindowClassName(hwnd)
-	info.Title = debugWindowTitle(hwnd)
-	return info, true
-}
-
-func (a *App) debugFormatWindowInfo(info windowDebugInfo) string {
-	role := a.debugWindowRole(info.HWND)
-	if role == "" {
-		role = "other"
-	}
-	return fmt.Sprintf(
-		"hwnd=%#x role=%s exists=%v visible=%v class=%q title=%q owner=%#x parent=%#x style=%#x exStyle=%#x pid=%d tid=%d rect=(%d,%d)-(%d,%d)",
-		uintptr(info.HWND),
-		role,
-		info.Exists,
-		info.Visible,
-		info.Class,
-		info.Title,
-		uintptr(info.Owner),
-		uintptr(info.Parent),
-		info.Style,
-		info.ExStyle,
-		info.ProcID,
-		info.ThreadID,
-		info.Rect.Left,
-		info.Rect.Top,
-		info.Rect.Right,
-		info.Rect.Bottom,
-	)
-}
-
-func (a *App) debugWindowRole(hwnd win.HWND) string {
-	roles := make([]string, 0, 2)
-	if hwnd != 0 {
-		if a.webHwnd != 0 && hwnd == a.webHwnd {
-			roles = append(roles, "web-main")
-		}
-		if a.trayOwner != nil && hwnd == a.trayOwner.Handle() {
-			roles = append(roles, "tray-owner")
-		}
-	}
-	return strings.Join(roles, ",")
-}
-
-func debugWindowsSignature(windows []windowDebugInfo) string {
-	if len(windows) == 0 {
-		return "none"
-	}
-
-	var sb strings.Builder
-	for i, info := range windows {
-		if i > 0 {
-			sb.WriteByte(';')
-		}
-		sb.WriteString(fmt.Sprintf(
-			"%#x,%t,%#x,%#x,%#x,%#x,%d,%d,%d,%d,%s,%s",
-			uintptr(info.HWND),
-			info.Visible,
-			uintptr(info.Owner),
-			uintptr(info.Parent),
-			info.Style,
-			info.ExStyle,
-			info.Rect.Left,
-			info.Rect.Top,
-			info.Rect.Right,
-			info.Rect.Bottom,
-			info.Class,
-			info.Title,
-		))
-	}
-	return sb.String()
-}
-
-func ensureWindowDebugProcsReady() bool {
+func ensureIsWindowProcReady() bool {
 	if err := user32DLL.Load(); err != nil {
-		return false
-	}
-	if err := procEnumWindows.Find(); err != nil {
-		return false
-	}
-	if err := procGetWindowTextW.Find(); err != nil {
-		return false
-	}
-	if err := procGetWindowTextLenW.Find(); err != nil {
 		return false
 	}
 	if err := procIsWindow.Find(); err != nil {
@@ -1707,14 +1300,14 @@ func ensureWindowDebugProcsReady() bool {
 }
 
 func isWindowHandleValid(hwnd win.HWND) bool {
-	if hwnd == 0 || !ensureWindowDebugProcsReady() {
+	if hwnd == 0 || !ensureIsWindowProcReady() {
 		return false
 	}
 	ret, _, _ := procIsWindow.Call(uintptr(hwnd))
 	return ret != 0
 }
 
-func debugWindowClassName(hwnd win.HWND) string {
+func windowClassName(hwnd win.HWND) string {
 	if hwnd == 0 {
 		return ""
 	}
@@ -1724,48 +1317,6 @@ func debugWindowClassName(hwnd win.HWND) string {
 		return ""
 	}
 	return syscall.UTF16ToString(buf[:n])
-}
-
-func debugWindowTitle(hwnd win.HWND) string {
-	if hwnd == 0 || !ensureWindowDebugProcsReady() {
-		return ""
-	}
-	length, _, _ := procGetWindowTextLenW.Call(uintptr(hwnd))
-	maxCount := int(length) + 1
-	if maxCount <= 1 {
-		return ""
-	}
-
-	buf := make([]uint16, maxCount)
-	n, _, _ := procGetWindowTextW.Call(
-		uintptr(hwnd),
-		uintptr(unsafe.Pointer(&buf[0])),
-		uintptr(maxCount),
-	)
-	if n == 0 {
-		return ""
-	}
-	return syscall.UTF16ToString(buf[:int(n)])
-}
-
-func (a *App) debugCollectChildClassNames(parent win.HWND) []string {
-	if parent == 0 || !isWindowHandleValid(parent) {
-		return nil
-	}
-
-	children := make([]string, 0, 8)
-	callback := syscall.NewCallback(func(hwnd uintptr, lParam uintptr) uintptr {
-		h := win.HWND(hwnd)
-		className := debugWindowClassName(h)
-		if className == "" {
-			className = "<unknown>"
-		}
-		children = append(children, fmt.Sprintf("%#x:%s", hwnd, className))
-		return 1
-	})
-	_ = win.EnumChildWindows(parent, callback, 0)
-	sort.Strings(children)
-	return children
 }
 
 func detectSystemDarkTheme() bool {

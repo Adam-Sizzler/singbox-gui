@@ -178,6 +178,6 @@ func (a *App) copyLogsToClipboard() error {
 }
 
 func (a *App) log(format string, args ...any) {
-	line := fmt.Sprintf("[%s] %s", time.Now().Format("15:04:05"), fmt.Sprintf(format, args...))
+	line := "[" + time.Now().Format("15:04:05") + "] " + fmt.Sprintf(format, args...)
 	a.appendLogLine(line)
 }

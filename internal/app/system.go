@@ -101,51 +101,6 @@ func isRunningAsAdmin() bool {
 	return ret != 0
 }
 
-func relaunchElevated() error {
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
-
-	var escaped []string
-	for _, a := range os.Args[1:] {
-		escaped = append(escaped, syscall.EscapeArg(a))
-	}
-	params := strings.Join(escaped, " ")
-
-	verbPtr, err := syscall.UTF16PtrFromString("runas")
-	if err != nil {
-		return err
-	}
-	exePtr, err := syscall.UTF16PtrFromString(exe)
-	if err != nil {
-		return err
-	}
-	paramsPtr, err := syscall.UTF16PtrFromString(params)
-	if err != nil {
-		return err
-	}
-
-	shell32 := syscall.NewLazyDLL("shell32.dll")
-	shellExecuteW := shell32.NewProc("ShellExecuteW")
-	ret, _, callErr := shellExecuteW.Call(
-		0,
-		uintptr(unsafe.Pointer(verbPtr)),
-		uintptr(unsafe.Pointer(exePtr)),
-		uintptr(unsafe.Pointer(paramsPtr)),
-		0,
-		1,
-	)
-
-	if ret <= 32 {
-		if callErr != syscall.Errno(0) {
-			return fmt.Errorf("ShellExecuteW ret=%d: %w", ret, callErr)
-		}
-		return fmt.Errorf("ShellExecuteW ret=%d", ret)
-	}
-	return nil
-}
-
 func openURLInDefaultBrowser(rawURL string) error {
 	target := strings.TrimSpace(rawURL)
 	if target == "" {

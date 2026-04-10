@@ -56,15 +56,11 @@ func (a *App) handleUIBridgeCall(req uiBridgeRequest) (any, error) {
 	if routePath == "" {
 		routePath = "/"
 	}
-	a.debugf("ui-bridge: request method=%s path=%s rawPath=%q bodyBytes=%d", method, routePath, rawPath, len(req.Body))
-
 	switch method {
 	case "GET":
 		switch routePath {
 		case "/api/state":
-			state := a.snapshotState()
-			a.debugf("ui-bridge: response method=%s path=%s running=%v busy=%v profile=%q", method, routePath, state.Running, state.Busy, state.CurrentProfile)
-			return state, nil
+			return a.snapshotState(), nil
 		case "/api/logs":
 			fromID := int64(0)
 			if s := strings.TrimSpace(parsedPath.Query().Get("from")); s != "" {
@@ -73,7 +69,6 @@ func (a *App) handleUIBridgeCall(req uiBridgeRequest) (any, error) {
 				}
 			}
 			entries, lastID := a.logsSince(fromID)
-			a.debugf("ui-bridge: response method=%s path=%s from=%d entries=%d lastID=%d", method, routePath, fromID, len(entries), lastID)
 			return logsResponse{Entries: entries, LastID: lastID}, nil
 		}
 	case "POST":
@@ -142,7 +137,7 @@ func (a *App) handleUIBridgeCall(req uiBridgeRequest) (any, error) {
 
 func decodeBridgeBody(raw json.RawMessage, v any) error {
 	body := bytes.TrimSpace(raw)
-	if len(body) == 0 || string(body) == "null" {
+	if len(body) == 0 || bytes.Equal(body, []byte("null")) {
 		body = []byte("{}")
 	}
 	dec := json.NewDecoder(bytes.NewReader(body))

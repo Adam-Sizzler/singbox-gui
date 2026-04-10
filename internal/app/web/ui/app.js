@@ -100,6 +100,7 @@
   var pollingActive = false;
   var statePollDelay = 0;
   var logsPollDelay = 0;
+  var lastStatusText = "";
   var STATE_POLL_IDLE_MS = 4500;
   var STATE_POLL_RUNNING_MS = 2200;
   var STATE_POLL_BUSY_MS = 1200;
@@ -267,6 +268,8 @@
   function setStatus(msg) {
     if (!statusNode) return;
     var text = String(msg || "").trim();
+    if (text === lastStatusText) return;
+    lastStatusText = text;
     statusNode.textContent = text;
     statusNode.className = text ? "status visible" : "status";
   }
@@ -1606,25 +1609,14 @@
   }
 
   document.addEventListener("mousedown", function (e) {
-    if (!profileMenuOpened || !profileWrap) return;
     var target = e.target || e.srcElement;
-    if (profileWrap.contains && !profileWrap.contains(target)) {
+    if (profileMenuOpened && profileWrap && profileWrap.contains && !profileWrap.contains(target)) {
       closeProfileMenu();
     }
-  });
-
-  document.addEventListener("mousedown", function (e) {
-    if (!releaseMenuOpened || !releaseMenuWrap) return;
-    var target = e.target || e.srcElement;
-    if (releaseMenuWrap.contains && !releaseMenuWrap.contains(target)) {
+    if (releaseMenuOpened && releaseMenuWrap && releaseMenuWrap.contains && !releaseMenuWrap.contains(target)) {
       closeReleaseMenu();
     }
-  });
-
-  document.addEventListener("mousedown", function (e) {
-    if (!mobileActionsOpened || !mobileActionsWrap) return;
-    var target = e.target || e.srcElement;
-    if (mobileActionsWrap.contains && !mobileActionsWrap.contains(target)) {
+    if (mobileActionsOpened && mobileActionsWrap && mobileActionsWrap.contains && !mobileActionsWrap.contains(target)) {
       closeMobileActionsMenu();
     }
   });

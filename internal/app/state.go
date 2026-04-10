@@ -71,8 +71,6 @@ type App struct {
 	logStart   int
 	nextLogID  int64
 
-	debugMu sync.Mutex
-
 	uiScaleMu       sync.Mutex
 	cachedUIScale   float64
 	cachedUIScaleAt time.Time

@@ -2,12 +2,7 @@
 
 package app
 
-func (a *App) debugf(format string, args ...any) {
-	_ = a
-	_ = format
-	_ = args
-	// Debug file logging is disabled in production builds.
-}
+func (a *App) debugf(string, ...any) {}
 
 func (a *App) setUICloseRequested(v bool) {
 	a.uiCloseMu.Lock()
