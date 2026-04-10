@@ -11,6 +11,8 @@
   var profileMenu = document.getElementById("profileMenu");
   var newProfileBtn = document.getElementById("newProfile");
   var deleteProfileBtn = document.getElementById("deleteProfile");
+  var selectorBlockNode = document.getElementById("selectorBlock");
+  var selectorGroupsNode = document.getElementById("selectorGroups");
   var checkConfigBtn = document.getElementById("checkConfig");
   var startStopBtn = document.getElementById("startStop");
   var copyLogsBtn = document.getElementById("copyLogs");
@@ -43,6 +45,7 @@
   var labelAutoStartCoreNode = document.getElementById("labelAutoStartCore");
   var labelStartMinimizedTrayNode = document.getElementById("labelStartMinimizedTray");
   var labelProfileNode = document.getElementById("labelProfile");
+  var labelSelectorNode = document.getElementById("labelSelector");
   var labelRunCheckNode = document.getElementById("labelRunCheck");
   var langRuBtn = document.getElementById("langRu");
   var langEnBtn = document.getElementById("langEn");
@@ -87,6 +90,10 @@
   var lastAutoUpdateHours = 12;
   var lastAutoStartCore = false;
   var lastStartMinimizedTray = false;
+  var selectorGroups = [];
+  var selectorGroupsRenderKey = "";
+  var selectorSwitchInFlight = false;
+  var selectorMenuOpenName = "";
   var lastUptimeSeconds = 0;
   var lastAppReleaseTag = "";
   var lastAppReleaseURL = "";
@@ -123,6 +130,8 @@
       autoStartCore: "Автозапуск ядра",
       startMinimizedTray: "Запуск в трее",
       profile: "Профиль:",
+      selector: "Селектор:",
+      selectorEmpty: "Нет доступных селекторов",
       runCheck: "Запуск/проверка:",
       checkConfig: "Проверить",
       newProfile: "Новый",
@@ -160,6 +169,8 @@
       autoStartCore: "Auto start core",
       startMinimizedTray: "Start in tray",
       profile: "Profile:",
+      selector: "Selector:",
+      selectorEmpty: "No selectors available",
       runCheck: "Run/Check:",
       checkConfig: "Check",
       newProfile: "New",
@@ -349,6 +360,7 @@
     if (labelAutoStartCoreNode) labelAutoStartCoreNode.textContent = tr("autoStartCore");
     if (labelStartMinimizedTrayNode) labelStartMinimizedTrayNode.textContent = tr("startMinimizedTray");
     if (labelProfileNode) labelProfileNode.textContent = tr("profile");
+    if (labelSelectorNode) labelSelectorNode.textContent = tr("selector");
     if (labelRunCheckNode) labelRunCheckNode.textContent = tr("runCheck");
     if (checkConfigBtn) checkConfigBtn.textContent = tr("checkConfig");
     if (newProfileBtn) newProfileBtn.textContent = tr("newProfile");
@@ -383,6 +395,7 @@
     if (mobileActionsToggleBtn) {
       mobileActionsToggleBtn.setAttribute("aria-label", tr("actionsMenu"));
     }
+    renderSelectorGroups(selectorGroups);
     setLogsFilterValidation(logsFilterError);
   }
 
@@ -745,6 +758,398 @@
     openMobileActionsMenu();
   }
 
+  function normalizeSelectorGroups(rawGroups) {
+    if (!rawGroups || !rawGroups.length) return [];
+    var normalized = [];
+    for (var i = 0; i < rawGroups.length; i++) {
+      var raw = rawGroups[i] || {};
+      var name = String(raw.name || "").trim();
+      if (!name) continue;
+
+      var optionsRaw = raw.options || [];
+      var options = [];
+      for (var j = 0; j < optionsRaw.length; j++) {
+        var option = String(optionsRaw[j] || "").trim();
+        if (!option) continue;
+        if (options.indexOf(option) >= 0) continue;
+        options.push(option);
+      }
+      if (!options.length) continue;
+
+      var current = String(raw.current || "").trim();
+      if (options.indexOf(current) < 0) {
+        current = options[0];
+      }
+
+      normalized.push({
+        name: name,
+        current: current,
+        options: options,
+        canSwitch: !!raw.can_switch
+      });
+    }
+    return normalized;
+  }
+
+  function buildSelectorGroupsRenderKey(groups) {
+    if (!groups || !groups.length) return "";
+    try {
+      return JSON.stringify(groups);
+    } catch (e) {
+      return String(Date.now());
+    }
+  }
+
+  function findSelectorGroupByName(name) {
+    var needle = String(name || "").trim().toLowerCase();
+    if (!needle) return null;
+    for (var i = 0; i < selectorGroups.length; i++) {
+      var group = selectorGroups[i];
+      if (String(group.name || "").trim().toLowerCase() === needle) {
+        return group;
+      }
+    }
+    return null;
+  }
+
+  function closeSelectorMenu() {
+    selectorMenuOpenName = "";
+    if (!selectorGroupsNode) return;
+    var menus = selectorGroupsNode.getElementsByClassName("selector-menu");
+    for (var i = 0; i < menus.length; i++) {
+      menus[i].style.left = "";
+      menus[i].style.top = "";
+      menus[i].style.width = "";
+      menus[i].style.maxHeight = "";
+      menus[i].hidden = true;
+    }
+    var toggles = selectorGroupsNode.getElementsByClassName("selector-picker");
+    for (var j = 0; j < toggles.length; j++) {
+      var toggle = toggles[j];
+      toggle.className = "control profile-picker selector-picker";
+      toggle.setAttribute("aria-expanded", "false");
+    }
+  }
+
+  function positionSelectorMenu(menuNode, wrapNode) {
+    if (!menuNode || !wrapNode || !wrapNode.getBoundingClientRect) return;
+
+    var rect = wrapNode.getBoundingClientRect();
+    var viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    var margin = 8;
+
+    var width = Math.max(120, Math.round(rect.width));
+    if (viewportWidth > margin * 2) {
+      width = Math.min(width, viewportWidth - margin * 2);
+    }
+
+    var left = Math.round(rect.left);
+    if (left + width > viewportWidth - margin) {
+      left = Math.max(margin, viewportWidth - margin - width);
+    }
+    if (left < margin) left = margin;
+
+    var spaceBelow = viewportHeight - rect.bottom - margin;
+    var spaceAbove = rect.top - margin;
+    var openUpward = spaceBelow < 140 && spaceAbove > spaceBelow;
+    var maxHeight;
+    var top;
+
+    if (openUpward) {
+      maxHeight = Math.min(320, Math.max(120, Math.floor(spaceAbove)));
+      top = Math.max(margin, Math.round(rect.top - maxHeight - 2));
+    } else {
+      maxHeight = Math.min(320, Math.max(120, Math.floor(spaceBelow)));
+      top = Math.round(rect.bottom + 2);
+      if (top + maxHeight > viewportHeight - margin) {
+        maxHeight = Math.max(80, viewportHeight - margin - top);
+      }
+    }
+
+    menuNode.style.left = String(left) + "px";
+    menuNode.style.top = String(top) + "px";
+    menuNode.style.width = String(width) + "px";
+    menuNode.style.maxHeight = String(maxHeight) + "px";
+  }
+
+  function openSelectorMenu(selectorName) {
+    if (!selectorGroupsNode) return;
+    var selector = String(selectorName || "").trim().toLowerCase();
+    if (!selector) return;
+    closeSelectorMenu();
+
+    var wraps = selectorGroupsNode.getElementsByClassName("selector-picker-wrap");
+    for (var i = 0; i < wraps.length; i++) {
+      var wrap = wraps[i];
+      var current = String(wrap.getAttribute("data-selector") || "").trim().toLowerCase();
+      if (current !== selector) continue;
+      var menu = wrap.getElementsByClassName("selector-menu")[0];
+      var picker = wrap.getElementsByClassName("selector-picker")[0];
+      if (menu) {
+        positionSelectorMenu(menu, wrap);
+        menu.hidden = false;
+      }
+      if (picker) {
+        picker.className = "control profile-picker selector-picker open";
+        picker.setAttribute("aria-expanded", "true");
+      }
+      selectorMenuOpenName = String(wrap.getAttribute("data-selector") || "").trim();
+      return;
+    }
+  }
+
+  function repositionOpenSelectorMenu() {
+    if (!selectorGroupsNode || !selectorMenuOpenName) return;
+    var selector = String(selectorMenuOpenName || "").trim().toLowerCase();
+    if (!selector) return;
+
+    var wraps = selectorGroupsNode.getElementsByClassName("selector-picker-wrap");
+    for (var i = 0; i < wraps.length; i++) {
+      var wrap = wraps[i];
+      var current = String(wrap.getAttribute("data-selector") || "").trim().toLowerCase();
+      if (current !== selector) continue;
+      var menu = wrap.getElementsByClassName("selector-menu")[0];
+      if (!menu || menu.hidden) return;
+      positionSelectorMenu(menu, wrap);
+      return;
+    }
+  }
+
+  function findAncestorByClass(node, className, stopNode) {
+    var current = node;
+    var needle = String(className || "").trim();
+    while (current && current !== stopNode && current !== document) {
+      var classNameRaw = String(current.className || "");
+      if (classNameRaw && (" " + classNameRaw + " ").indexOf(" " + needle + " ") >= 0) {
+        return current;
+      }
+      current = current.parentNode;
+    }
+    return null;
+  }
+
+  function applySelectorControlsDisabledState() {
+    if (!selectorGroupsNode) return;
+    var toggles = selectorGroupsNode.getElementsByClassName("selector-picker");
+    if (!toggles || !toggles.length) return;
+    for (var i = 0; i < toggles.length; i++) {
+      var toggleNode = toggles[i];
+      var selectorName = toggleNode.getAttribute("data-selector") || "";
+      var group = findSelectorGroupByName(selectorName);
+      var disabled = selectorSwitchInFlight || lastBusy || !group || !group.canSwitch;
+      toggleNode.disabled = !!disabled;
+    }
+
+    var options = selectorGroupsNode.getElementsByClassName("selector-option");
+    for (var j = 0; j < options.length; j++) {
+      var optionNode = options[j];
+      var optionSelectorName = optionNode.getAttribute("data-selector") || "";
+      var optionGroup = findSelectorGroupByName(optionSelectorName);
+      var optionDisabled = selectorSwitchInFlight || lastBusy || !optionGroup || !optionGroup.canSwitch;
+      optionNode.disabled = !!optionDisabled;
+    }
+
+    if (selectorSwitchInFlight || lastBusy) {
+      closeSelectorMenu();
+    }
+  }
+
+  function renderSelectorGroups(nextGroups) {
+    selectorGroups = nextGroups || [];
+
+    if (!selectorBlockNode || !selectorGroupsNode) return;
+    selectorBlockNode.hidden = false;
+    if (!selectorGroups.length) {
+      closeSelectorMenu();
+
+      var emptyText = tr("selectorEmpty");
+      var emptyKey = "__selector_empty__:" + emptyText;
+      if (selectorGroupsRenderKey === emptyKey) {
+        return;
+      }
+
+      var emptyItem = document.createElement("div");
+      emptyItem.className = "selector-item selector-item-empty";
+
+      var emptyWrap = document.createElement("div");
+      emptyWrap.className = "profile-picker-wrap selector-picker-wrap selector-picker-wrap-empty";
+
+      var emptyGroup = document.createElement("div");
+      emptyGroup.className = "profile-name-group selector-name-group";
+
+      var emptyInput = document.createElement("input");
+      emptyInput.className = "control profile-name-input selector-current-input selector-current-input-empty";
+      emptyInput.type = "text";
+      emptyInput.readOnly = true;
+      emptyInput.tabIndex = -1;
+      emptyInput.value = emptyText;
+      emptyInput.title = emptyText;
+      emptyInput.setAttribute("aria-hidden", "true");
+      emptyGroup.appendChild(emptyInput);
+
+      var emptyPicker = document.createElement("button");
+      emptyPicker.type = "button";
+      emptyPicker.className = "control profile-picker selector-picker selector-picker-empty";
+      emptyPicker.disabled = true;
+      emptyPicker.tabIndex = -1;
+      emptyPicker.setAttribute("aria-hidden", "true");
+
+      var emptyArrowNode = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      emptyArrowNode.setAttribute("class", "profile-arrow");
+      emptyArrowNode.setAttribute("stroke", "currentColor");
+      emptyArrowNode.setAttribute("fill", "none");
+      emptyArrowNode.setAttribute("stroke-width", "2");
+      emptyArrowNode.setAttribute("viewBox", "0 0 24 24");
+      emptyArrowNode.setAttribute("stroke-linecap", "round");
+      emptyArrowNode.setAttribute("stroke-linejoin", "round");
+      emptyArrowNode.setAttribute("height", "20");
+      emptyArrowNode.setAttribute("width", "20");
+      emptyArrowNode.setAttribute("aria-hidden", "true");
+      emptyArrowNode.setAttribute("focusable", "false");
+      var emptyArrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      emptyArrowPath.setAttribute("d", "M6 9l6 6l6 -6");
+      emptyArrowNode.appendChild(emptyArrowPath);
+      emptyPicker.appendChild(emptyArrowNode);
+
+      emptyGroup.appendChild(emptyPicker);
+      emptyWrap.appendChild(emptyGroup);
+      emptyItem.appendChild(emptyWrap);
+
+      selectorGroupsNode.innerHTML = "";
+      selectorGroupsNode.appendChild(emptyItem);
+      selectorGroupsRenderKey = emptyKey;
+      return;
+    }
+
+    var nextKey = buildSelectorGroupsRenderKey(selectorGroups);
+    if (nextKey === selectorGroupsRenderKey) {
+      applySelectorControlsDisabledState();
+      return;
+    }
+
+    var showGroupName = selectorGroups.length > 1;
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < selectorGroups.length; i++) {
+      var group = selectorGroups[i];
+      var item = document.createElement("div");
+      item.className = "selector-item";
+
+      if (showGroupName) {
+        var label = document.createElement("div");
+        label.className = "selector-item-label";
+        label.textContent = group.name;
+        item.appendChild(label);
+      }
+
+      var wrap = document.createElement("div");
+      wrap.className = "profile-picker-wrap selector-picker-wrap";
+      wrap.setAttribute("data-selector", group.name);
+
+      var nameGroup = document.createElement("div");
+      nameGroup.className = "profile-name-group selector-name-group";
+
+      var currentInput = document.createElement("input");
+      currentInput.className = "control profile-name-input selector-current-input";
+      currentInput.type = "text";
+      currentInput.readOnly = true;
+      currentInput.tabIndex = -1;
+      currentInput.value = group.current;
+      currentInput.title = group.current;
+      currentInput.setAttribute("aria-hidden", "true");
+      nameGroup.appendChild(currentInput);
+
+      var picker = document.createElement("button");
+      picker.type = "button";
+      picker.className = "control profile-picker selector-picker";
+      picker.setAttribute("data-selector", group.name);
+      picker.setAttribute("aria-haspopup", "listbox");
+      picker.setAttribute("aria-expanded", "false");
+      picker.title = group.current;
+      picker.onmouseenter = function () {
+        var pickerSelector = String(this.getAttribute("data-selector") || "").trim();
+        if (!pickerSelector || this.disabled) return;
+        openSelectorMenu(pickerSelector);
+      };
+
+      var arrowNode = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      arrowNode.setAttribute("class", "profile-arrow");
+      arrowNode.setAttribute("stroke", "currentColor");
+      arrowNode.setAttribute("fill", "none");
+      arrowNode.setAttribute("stroke-width", "2");
+      arrowNode.setAttribute("viewBox", "0 0 24 24");
+      arrowNode.setAttribute("stroke-linecap", "round");
+      arrowNode.setAttribute("stroke-linejoin", "round");
+      arrowNode.setAttribute("height", "20");
+      arrowNode.setAttribute("width", "20");
+      arrowNode.setAttribute("aria-hidden", "true");
+      arrowNode.setAttribute("focusable", "false");
+      var arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      arrowPath.setAttribute("d", "M6 9l6 6l6 -6");
+      arrowNode.appendChild(arrowPath);
+      picker.appendChild(arrowNode);
+
+      nameGroup.appendChild(picker);
+      wrap.appendChild(nameGroup);
+
+      var menu = document.createElement("div");
+      menu.className = "profile-menu selector-menu";
+      menu.setAttribute("role", "listbox");
+      menu.hidden = true;
+      for (var j = 0; j < group.options.length; j++) {
+        var optionValue = group.options[j];
+        var optionNode = document.createElement("button");
+        optionNode.type = "button";
+        optionNode.className = "profile-option selector-option" + (optionValue === group.current ? " active" : "");
+        optionNode.setAttribute("role", "option");
+        optionNode.setAttribute("aria-selected", optionValue === group.current ? "true" : "false");
+        optionNode.setAttribute("data-selector", group.name);
+        optionNode.setAttribute("data-outbound", optionValue);
+        optionNode.value = optionValue;
+        optionNode.textContent = optionValue;
+        menu.appendChild(optionNode);
+      }
+      wrap.appendChild(menu);
+      item.appendChild(wrap);
+
+      frag.appendChild(item);
+    }
+
+    selectorGroupsNode.innerHTML = "";
+    selectorGroupsNode.appendChild(frag);
+    selectorGroupsRenderKey = nextKey;
+    selectorMenuOpenName = "";
+    applySelectorControlsDisabledState();
+  }
+
+  function runSelectorSwitch(selectorName, outboundName, selectNode) {
+    if (selectorSwitchInFlight || lastBusy) return;
+    var selector = String(selectorName || "").trim();
+    var outbound = String(outboundName || "").trim();
+    if (!selector || !outbound) return;
+
+    selectorSwitchInFlight = true;
+    applySelectorControlsDisabledState();
+
+    api("POST", "/api/selector/select", {
+      selector: selector,
+      outbound: outbound
+    }, function (err, state) {
+      selectorSwitchInFlight = false;
+      if (err) {
+        if (selectNode && selectNode.focus) {
+          try { selectNode.focus(); } catch (e) {}
+        }
+        setStatus(tr("errorPrefix") + err.message);
+        showToast("error", tr("errorPrefix") + err.message);
+        refreshState(true);
+        return;
+      }
+      renderState(state);
+      applySelectorControlsDisabledState();
+    });
+  }
+
   function computeStatePollDelay() {
     if (lastBusy) return STATE_POLL_BUSY_MS;
     if (lastRunning) return STATE_POLL_RUNNING_MS;
@@ -891,6 +1296,7 @@
     var prevAppUpdateAvailable = lastAppUpdateAvailable;
     var prevAppLatestReleaseTag = lastAppLatestReleaseTag;
     var prevAppLatestReleaseURL = lastAppLatestReleaseURL;
+    var prevSelectorGroupsKey = selectorGroupsRenderKey;
 
     currentLanguage = normalizeLanguage(state.language || currentLanguage);
 
@@ -942,6 +1348,7 @@
     if (startMinimizedTrayInput && !startupPatchInFlight && !startupPatchQueued) {
       startMinimizedTrayInput.checked = lastStartMinimizedTray;
     }
+    var nextSelectorGroups = normalizeSelectorGroups(state.selector_groups || []);
     applyUIScale(state.ui_scale);
 
     lastRunning = !!state.running;
@@ -953,20 +1360,23 @@
     lastAppUpdateAvailable = !!state.app_update_available;
     lastAppLatestReleaseTag = String(state.app_latest_release_tag || "").trim();
     lastAppLatestReleaseURL = String(state.app_latest_release_url || "").trim();
+    renderSelectorGroups(nextSelectorGroups);
     if (startStopBtn) {
       startStopBtn.disabled = lastBusy;
     }
     setCheckButtonsDisabled(lastBusy);
 
     var languageChanged = prevLanguage !== currentLanguage;
+    var needsInitialLanguageApply = !initialStateRendered;
     var releaseChanged =
       prevAppReleaseTag !== lastAppReleaseTag ||
       prevAppReleaseURL !== lastAppReleaseURL ||
       prevAppUpdateAvailable !== lastAppUpdateAvailable ||
       prevAppLatestReleaseTag !== lastAppLatestReleaseTag ||
       prevAppLatestReleaseURL !== lastAppLatestReleaseURL;
+    var selectorGroupsChanged = prevSelectorGroupsKey !== selectorGroupsRenderKey;
 
-    if (languageChanged) {
+    if (languageChanged || needsInitialLanguageApply) {
       applyLanguageUI();
     } else {
       if (startStopBtn) {
@@ -974,6 +1384,11 @@
       }
       renderStartStopIndicator();
       renderUptime(lastUptimeSeconds, lastRunning);
+      if (selectorGroupsChanged || prevBusy !== lastBusy || prevRunning !== lastRunning) {
+        renderSelectorGroups(selectorGroups);
+      } else {
+        applySelectorControlsDisabledState();
+      }
       if (releaseChanged || prevBusy !== lastBusy || prevRunning !== lastRunning) {
         renderAppReleaseMenu(lastAppReleaseTag, lastAppReleaseURL, lastAppUpdateAvailable, lastAppLatestReleaseTag, lastAppLatestReleaseURL);
       } else if (updateAppBtn) {
@@ -1619,6 +2034,9 @@
     if (mobileActionsOpened && mobileActionsWrap && mobileActionsWrap.contains && !mobileActionsWrap.contains(target)) {
       closeMobileActionsMenu();
     }
+    if (selectorMenuOpenName && selectorGroupsNode && selectorGroupsNode.contains && !selectorGroupsNode.contains(target)) {
+      closeSelectorMenu();
+    }
   });
 
   document.addEventListener("keydown", function (e) {
@@ -1632,6 +2050,9 @@
       }
       if (mobileActionsOpened) {
         closeMobileActionsMenu();
+      }
+      if (selectorMenuOpenName) {
+        closeSelectorMenu();
       }
       if (isConfirmModalOpen()) {
         if (e.preventDefault) e.preventDefault();
@@ -1647,6 +2068,14 @@
       }
     }
   });
+
+  window.addEventListener("resize", function () {
+    repositionOpenSelectorMenu();
+  });
+
+  document.addEventListener("scroll", function () {
+    repositionOpenSelectorMenu();
+  }, true);
 
   if (confirmModalOverlay) {
     confirmModalOverlay.onclick = function () {
@@ -1684,6 +2113,30 @@
       closeMobileActionsMenu();
       runCopyLogsAction();
     };
+  }
+
+  if (selectorGroupsNode && selectorGroupsNode.addEventListener) {
+    selectorGroupsNode.addEventListener("click", function (e) {
+      var event = e || window.event;
+      var target = event && (event.target || event.srcElement);
+      if (!target) return;
+
+      var optionNode = findAncestorByClass(target, "selector-option", selectorGroupsNode);
+      if (optionNode) {
+        var optionSelector = String(optionNode.getAttribute("data-selector") || "").trim();
+        var optionOutbound = String(optionNode.getAttribute("data-outbound") || optionNode.value || "").trim();
+        closeSelectorMenu();
+        runSelectorSwitch(optionSelector, optionOutbound, optionNode);
+        return;
+      }
+
+      var pickerNode = findAncestorByClass(target, "selector-picker", selectorGroupsNode);
+      if (pickerNode) {
+        var pickerSelector = String(pickerNode.getAttribute("data-selector") || "").trim();
+        if (!pickerSelector || pickerNode.disabled) return;
+        openSelectorMenu(pickerSelector);
+      }
+    });
   }
 
   langRuBtn.onclick = function () {
@@ -1831,6 +2284,7 @@
     if (profileRenameTimer) clearTimeout(profileRenameTimer);
     closeReleaseMenu();
     closeMobileActionsMenu();
+    closeSelectorMenu();
     closeConfirmModal();
   };
 })();

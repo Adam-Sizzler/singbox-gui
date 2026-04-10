@@ -109,6 +109,15 @@ func (a *App) handleUIBridgeCall(req uiBridgeRequest) (any, error) {
 				return nil, err
 			}
 			return a.snapshotState(), nil
+		case "/api/selector/select":
+			var selectorReq selectorRequest
+			if err := decodeBridgeBody(req.Body, &selectorReq); err != nil {
+				return nil, err
+			}
+			if err := a.setSelectorOutbound(selectorReq.Selector, selectorReq.Outbound); err != nil {
+				return nil, err
+			}
+			return a.snapshotState(), nil
 		case "/api/action/start-stop":
 			if err := a.toggleStartStop(); err != nil {
 				return nil, err

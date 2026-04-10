@@ -171,13 +171,49 @@ func (a *App) startPipeline() error {
 		}
 	}
 
+	clashSupported, err := singBoxSupportsClashAPI(a.singBoxPath)
+	if err != nil {
+		a.log("WARN: не удалось проверить поддержку with_clash_api: %v (использую clash api по умолчанию)", err)
+		clashSupported = true
+	}
+
+	controllerAddr := ""
+	controllerSecret := ""
+	if clashSupported {
+		controllerAddr, err = allocateLocalControllerAddr()
+		if err != nil {
+			return fmt.Errorf("не удалось выделить порт для clash api: %w", err)
+		}
+		controllerSecret, err = generateClashSecret()
+		if err != nil {
+			return fmt.Errorf("не удалось создать секрет clash api: %w", err)
+		}
+		if err := a.ensureRuntimeConfigHasClashAPI(runtimeCfgPath, controllerAddr, controllerSecret); err != nil {
+			return fmt.Errorf("не удалось включить clash api в %s: %w", runtimeCfgFile, err)
+		}
+	} else {
+		if err := a.stripRuntimeConfigClashAPI(runtimeCfgPath); err != nil {
+			return fmt.Errorf("не удалось отключить clash api в %s: %w", runtimeCfgFile, err)
+		}
+		a.log("WARN: установленный sing-box не поддерживает with_clash_api, live-переключение selector отключено")
+	}
+
 	a.stopProcess()
+	if clashSupported {
+		a.setClashSession(controllerAddr, controllerSecret, runtimeCfgPath)
+	} else {
+		a.resetClashSession()
+	}
 	if err := a.startProcess(runtimeCfgPath); err != nil {
+		a.resetClashSession()
 		return err
 	}
 
 	a.log("sing-box запущен")
 	a.setCoreDesiredRunning(true)
+	if clashSupported {
+		a.applySavedSelectorSelections(active)
+	}
 	return nil
 }
 
@@ -268,6 +304,7 @@ func (a *App) startProcess(runtimeCfgPath string) error {
 			a.procStartedAt = time.Time{}
 		}
 		a.procMu.Unlock()
+		a.resetClashSession()
 
 		if err != nil {
 			if !wasStop {
@@ -289,6 +326,7 @@ func (a *App) stopProcess() {
 	waitDone := a.procWaitDone
 	if proc == nil || proc.Process == nil {
 		a.procMu.Unlock()
+		a.resetClashSession()
 		return
 	}
 	a.procStopRequested = true
@@ -313,6 +351,7 @@ func (a *App) stopProcess() {
 	if waitDone != nil {
 		_ = waitForProcessExit(waitDone, forceStopTimeout)
 	}
+	a.resetClashSession()
 	a.log("sing-box остановлен")
 }
 

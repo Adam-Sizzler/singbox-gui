@@ -12,9 +12,11 @@ English version: `README.md`
 - Загрузка `sing-box.exe` по выбранной версии (`latest` или semver)
 - Загрузка runtime-файла `config.json` по URL (`User-Agent: sfw`)
 - Управление процессом из UI (`Start` / `Stop`)
+- Переключение `selector`/`outbound` из UI через Clash API (без рестарта ядра)
 - Цветной вывод логов в UI с поддержкой ANSI
 - Профили (`создать`, `выбрать`, `удалить`)
 - Локализация RU/EN с переключением языка в UI
+- Runtime-конфиг перед запуском автоматически дополняется `experimental.clash_api` на `127.0.0.1` c динамическим портом и секретом
 - Автообновление runtime-конфига из URL:
   - интервал по умолчанию: 12 часов
   - `0` = отключено
@@ -77,6 +79,8 @@ profiles:
   - name: default
     url: ""
     version: latest
+    selector_selections:
+      my-selector: proxy-a
 ```
 
 ## Импорт по протоколу
@@ -105,6 +109,12 @@ sing-box://import-remote-profile?url=https%3A%2F%2Fexample.com%2Fsub#profile-nam
 - любое положительное значение — интервал в часах
 
 `config.json` заменяется только если скачанный файл валидный JSON.
+
+## Selector и Clash API
+
+- Если в runtime-конфиге есть outbound типа `selector`, в UI показываются dropdown-поля выбора.
+- При запущенном ядре переключение выполняется live через `PUT /proxies/{selector}` (Clash API), без перезапуска процесса.
+- Выбранный outbound сохраняется в профиль (`selector_selections`) и автоматически применяется после следующего запуска ядра.
 
 ## GitHub Actions
 

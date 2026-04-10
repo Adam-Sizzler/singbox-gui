@@ -131,6 +131,7 @@ func (a *App) runAutoUpdateOnce() {
 		return
 	}
 	if updated {
+		a.invalidateSelectorCache()
 		a.log("Автообновление: обновлён %s (профиль: %s)", runtimeCfgFile, profileName)
 	}
 }

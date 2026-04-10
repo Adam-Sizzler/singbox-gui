@@ -12,9 +12,11 @@ Russian version: `README.ru.md`
 - Downloads `sing-box.exe` by selected version (`latest` or semver)
 - Downloads runtime `config.json` from subscription URL (`User-Agent: sfw`)
 - Process control from UI (`Start` / `Stop`)
+- `selector`/`outbound` switching from UI via Clash API (no core restart)
 - ANSI-aware colored log rendering in UI
 - Multiple profiles (`create`, `select`, `delete`)
 - RU/EN localization with language switch in UI
+- Runtime config is automatically patched before start with `experimental.clash_api` on `127.0.0.1` using a dynamic port and per-run secret
 - Automatic runtime config refresh from URL:
   - default interval: 12 hours
   - `0` means disabled
@@ -77,6 +79,8 @@ profiles:
   - name: default
     url: ""
     version: latest
+    selector_selections:
+      my-selector: proxy-a
 ```
 
 ## Protocol Import
@@ -105,6 +109,12 @@ Behavior:
 - any positive value means interval in hours
 
 The app only replaces `config.json` if the downloaded content is valid JSON.
+
+## Selector and Clash API
+
+- If runtime config contains outbound groups of type `selector`, the UI shows selector dropdowns.
+- While the core is running, switching is done live via `PUT /proxies/{selector}` (Clash API), without process restart.
+- The selected outbound is saved per profile (`selector_selections`) and applied automatically on next core start.
 
 ## GitHub Actions
 

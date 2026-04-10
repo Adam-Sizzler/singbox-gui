@@ -71,20 +71,30 @@
         </div>
       </div>
 
-      <div class="halves-row">
-        <div class="half-block half-block-left">
-          <div class="half-content">
-            <label class="half-label" id="labelVersion" for="version">Версия ядра:</label>
-            <div class="half-control">
+      <div class="triplet-row">
+        <div class="triplet-block triplet-block-version">
+          <div class="triplet-content">
+            <label class="triplet-label" id="labelVersion" for="version">Версия ядра:</label>
+            <div class="triplet-control">
               <input class="control" id="version" type="text" autocomplete="off">
             </div>
           </div>
         </div>
-        <div class="half-block half-block-right">
-          <div class="half-content">
-            <label class="half-label" id="labelAutoUpdate" for="autoUpdateHours">Автообновление (часы):</label>
-            <div class="half-control">
+
+        <div class="triplet-block triplet-block-autoupdate">
+          <div class="triplet-content">
+            <label class="triplet-label" id="labelAutoUpdate" for="autoUpdateHours">Автообновление (часы):</label>
+            <div class="triplet-control">
               <input class="control" id="autoUpdateHours" type="number" min="0" step="1" autocomplete="off">
+            </div>
+          </div>
+        </div>
+
+        <div class="triplet-block triplet-block-selector" id="selectorBlock">
+          <div class="triplet-content">
+            <label class="triplet-label" id="labelSelector">Селектор:</label>
+            <div class="triplet-control">
+              <div id="selectorGroups" class="selector-groups"></div>
             </div>
           </div>
         </div>

@@ -62,6 +62,15 @@ type App struct {
 	procWaitDone      chan struct{}
 	procStartedAt     time.Time
 	runtimeCfgMu      sync.Mutex
+	clashMu           sync.Mutex
+	clashController   string
+	clashSecret       string
+	clashRuntimeCfg   string
+
+	selectorCacheProfile   string
+	selectorCacheLive      bool
+	selectorCacheExpiresAt time.Time
+	selectorCacheGroups    []SelectorGroupState
 
 	runMu         sync.Mutex
 	runningAction bool
@@ -124,30 +133,33 @@ type logEntry struct {
 }
 
 type AppState struct {
-	CurrentProfile      string          `json:"current_profile"`
-	Profiles            []ConfigProfile `json:"profiles"`
-	Language            string          `json:"language"`
-	URL                 string          `json:"url"`
-	Version             string          `json:"version"`
-	AutoUpdateHours     int             `json:"auto_update_hours"`
-	AutoStartCore       bool            `json:"auto_start_core"`
-	StartMinimizedTray  bool            `json:"start_minimized_to_tray"`
-	UIScale             float64         `json:"ui_scale"`
-	UptimeSeconds       int64           `json:"uptime_seconds"`
-	Running             bool            `json:"running"`
-	Busy                bool            `json:"busy"`
-	ProtoRegWarn        string          `json:"proto_reg_warn,omitempty"`
-	AppReleaseTag       string          `json:"app_release_tag,omitempty"`
-	AppReleaseURL       string          `json:"app_release_url,omitempty"`
-	AppUpdateAvailable  bool            `json:"app_update_available"`
-	AppLatestReleaseTag string          `json:"app_latest_release_tag,omitempty"`
-	AppLatestReleaseURL string          `json:"app_latest_release_url,omitempty"`
+	CurrentProfile      string               `json:"current_profile"`
+	Profiles            []ConfigProfile      `json:"profiles"`
+	Language            string               `json:"language"`
+	URL                 string               `json:"url"`
+	Version             string               `json:"version"`
+	SelectorGroups      []SelectorGroupState `json:"selector_groups,omitempty"`
+	AutoUpdateHours     int                  `json:"auto_update_hours"`
+	AutoStartCore       bool                 `json:"auto_start_core"`
+	StartMinimizedTray  bool                 `json:"start_minimized_to_tray"`
+	UIScale             float64              `json:"ui_scale"`
+	UptimeSeconds       int64                `json:"uptime_seconds"`
+	Running             bool                 `json:"running"`
+	Busy                bool                 `json:"busy"`
+	ProtoRegWarn        string               `json:"proto_reg_warn,omitempty"`
+	AppReleaseTag       string               `json:"app_release_tag,omitempty"`
+	AppReleaseURL       string               `json:"app_release_url,omitempty"`
+	AppUpdateAvailable  bool                 `json:"app_update_available"`
+	AppLatestReleaseTag string               `json:"app_latest_release_tag,omitempty"`
+	AppLatestReleaseURL string               `json:"app_latest_release_url,omitempty"`
 }
 
 func (a *App) setConfig(cfg AppConfig) {
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
 	normalizeConfigProfiles(&cfg)
+	cfg.Profiles = cloneConfigProfiles(cfg.Profiles)
+	cfg.SingboxEnv = cloneEnvMap(cfg.SingboxEnv)
 	a.config = cfg
 }
 
@@ -156,6 +168,8 @@ func (a *App) getConfigSnapshot() AppConfig {
 	defer a.cfgMu.Unlock()
 	cfg := a.config
 	normalizeConfigProfiles(&cfg)
+	cfg.Profiles = cloneConfigProfiles(cfg.Profiles)
+	cfg.SingboxEnv = cloneEnvMap(cfg.SingboxEnv)
 	return cfg
 }
 
@@ -165,6 +179,7 @@ func (a *App) persistConfig(cfg AppConfig) error {
 		return err
 	}
 	a.setConfig(cfg)
+	a.invalidateSelectorCache()
 	a.triggerAutoUpdateReconfigure()
 	return nil
 }
@@ -186,25 +201,28 @@ func (a *App) uiScaleSnapshot() float64 {
 func (a *App) snapshotState() AppState {
 	cfg := a.getConfigSnapshot()
 	active := activeProfileFromConfig(cfg)
+	running := a.isProcessRunning()
 
 	a.runMu.Lock()
 	busy := a.runningAction
 	a.runMu.Unlock()
 
 	appUpdateAvailable, appLatestTag, appLatestURL := a.appUpdateSnapshot()
+	selectorGroups := a.selectorGroupsSnapshot(active, running, busy)
 
 	return AppState{
 		CurrentProfile:      cfg.CurrentProfile,
-		Profiles:            append([]ConfigProfile(nil), cfg.Profiles...),
+		Profiles:            cloneConfigProfiles(cfg.Profiles),
 		Language:            cfg.Language,
 		URL:                 active.URL,
 		Version:             active.Version,
+		SelectorGroups:      selectorGroups,
 		AutoUpdateHours:     cfg.AutoUpdateHours,
 		AutoStartCore:       cfg.AutoStartCore,
 		StartMinimizedTray:  cfg.StartMinimizedToTray,
 		UIScale:             a.uiScaleSnapshot(),
 		UptimeSeconds:       a.processUptimeSeconds(),
-		Running:             a.isProcessRunning(),
+		Running:             running,
 		Busy:                busy,
 		ProtoRegWarn:        a.protoRegWarn,
 		AppReleaseTag:       currentAppReleaseTag(),

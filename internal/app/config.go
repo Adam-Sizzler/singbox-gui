@@ -63,9 +63,10 @@ func (c AppConfig) MarshalYAML() (interface{}, error) {
 }
 
 type ConfigProfile struct {
-	Name    string `yaml:"name" json:"name"`
-	URL     string `yaml:"url" json:"url"`
-	Version string `yaml:"version" json:"version"`
+	Name               string            `yaml:"name" json:"name"`
+	URL                string            `yaml:"url" json:"url"`
+	Version            string            `yaml:"version" json:"version"`
+	SelectorSelections map[string]string `yaml:"selector_selections,omitempty" json:"selector_selections,omitempty"`
 }
 
 func loadOrCreateConfig(path string) (AppConfig, error) {
@@ -180,9 +181,10 @@ func normalizeConfigProfiles(cfg *AppConfig) {
 		}
 
 		normalized = append(normalized, ConfigProfile{
-			Name:    name,
-			URL:     strings.TrimSpace(p.URL),
-			Version: version,
+			Name:               name,
+			URL:                strings.TrimSpace(p.URL),
+			Version:            version,
+			SelectorSelections: normalizeSelectorSelections(p.SelectorSelections),
 		})
 	}
 	cfg.Profiles = normalized
@@ -201,6 +203,52 @@ func normalizeConfigProfiles(cfg *AppConfig) {
 	}
 	cfg.CurrentProfile = cfg.Profiles[idx].Name
 	syncLegacyFromCurrent(cfg)
+}
+
+func normalizeSelectorSelections(raw map[string]string) map[string]string {
+	if len(raw) == 0 {
+		return nil
+	}
+	normalized := make(map[string]string, len(raw))
+	for rawKey, rawValue := range raw {
+		key := strings.TrimSpace(rawKey)
+		value := strings.TrimSpace(rawValue)
+		if key == "" || value == "" {
+			continue
+		}
+		normalized[key] = value
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
+}
+
+func cloneSelectorSelections(raw map[string]string) map[string]string {
+	if len(raw) == 0 {
+		return nil
+	}
+	cloned := make(map[string]string, len(raw))
+	for k, v := range raw {
+		cloned[k] = v
+	}
+	return cloned
+}
+
+func cloneConfigProfiles(profiles []ConfigProfile) []ConfigProfile {
+	if len(profiles) == 0 {
+		return nil
+	}
+	cloned := make([]ConfigProfile, 0, len(profiles))
+	for _, profile := range profiles {
+		cloned = append(cloned, ConfigProfile{
+			Name:               profile.Name,
+			URL:                profile.URL,
+			Version:            profile.Version,
+			SelectorSelections: cloneSelectorSelections(profile.SelectorSelections),
+		})
+	}
+	return cloned
 }
 
 func normalizeSingboxEnv(raw map[string]string) map[string]string {
