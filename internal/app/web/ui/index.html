@@ -10,11 +10,11 @@
 <body class="ui-loading">
   <div class="app-shell">
     <aside class="sidebar">
-      <div class="sidebar-brand">
-        <div class="sidebar-brand-title">
-          <span id="sidebarBrandTitle">singbox-gui</span>
+      <div class="sidebar-status-wrap">
+        <div class="sidebar-brand" aria-hidden="true">
+          <span id="sidebarRunIndicator" class="sidebar-run-indicator" aria-hidden="true"></span>
         </div>
-        <span id="sidebarRunIndicator" class="sidebar-run-indicator" aria-hidden="true"></span>
+        <div id="sidebarStatusLabel" class="sidebar-status-label">Status</div>
       </div>
 
       <nav class="sidebar-nav" aria-label="Main Navigation">
@@ -64,9 +64,12 @@
         </div>
       </nav>
 
-      <div class="sidebar-meta">
-        <div id="appVersionLabel" class="sidebar-meta-label">Версия</div>
-        <div id="appVersionValue" class="sidebar-meta-value">-</div>
+      <div class="sidebar-theme">
+        <button class="control sidebar-theme-cycle" id="sidebarThemeCycle" type="button" aria-label="Theme mode">
+          <svg id="sidebarThemeIcon" viewBox="0 -960 960 960" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+            <path d="M396-396q-32-32-58.5-67T289-537q-5 14-6.5 28.5T281-480q0 83 58 141t141 58q14 0 28.5-2t28.5-6q-39-22-74-48.5T396-396Zm57-56q51 51 114 87.5T702-308q-40 51-98 79.5T481-200q-117 0-198.5-81.5T201-480q0-65 28.5-123t79.5-98q20 72 56.5 135T453-452Zm290 72q-20-5-39.5-11T665-405q8-18 11.5-36.5T680-480q0-83-58.5-141.5T480-680q-20 0-38.5 3.5T405-665q-8-19-13.5-38T381-742q24-9 49-13.5t51-4.5q117 0 198.5 81.5T761-480q0 26-4.5 51T743-380ZM440-840v-120h80v120h-80Zm0 840v-120h80V0h-80Zm323-706-57-57 85-84 57 56-85 85ZM169-113l-57-56 85-85 57 57-85 84Zm671-327v-80h120v80H840ZM0-440v-80h120v80H0Zm791 328-85-85 57-57 84 85-56 57ZM197-706l-84-85 56-57 85 85-57 57Zm199 310Z" fill="currentColor"></path>
+          </svg>
+        </button>
       </div>
     </aside>
 
@@ -156,6 +159,32 @@
                     </div>
                   </div>
                 </div>
+
+                <div class="field-row settings-autoupdate-row">
+                  <label class="field-label" id="labelAutoUpdate" for="autoUpdateHours">Автообновление (часы):</label>
+                  <div class="field-control settings-autoupdate-control">
+                    <input class="control hours-input" id="autoUpdateHours" type="number" min="0" step="1" autocomplete="off">
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <label class="field-label" id="labelProfileList" for="profilePickerProfiles">Профиль:</label>
+                  <div class="field-control">
+                    <div class="profile-picker-wrap" id="profileWrapProfiles">
+                      <div class="profile-name-group">
+                        <div class="control profile-value-box" id="profileValueBoxProfiles">
+                          <span id="profileValueProfiles" class="profile-value">-</span>
+                        </div>
+                        <button class="control profile-picker" id="profilePickerProfiles" type="button" aria-haspopup="listbox" aria-expanded="false">
+                          <svg class="profile-arrow" stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="20" width="20" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 9l6 6l6 -6"></path>
+                          </svg>
+                        </button>
+                      </div>
+                      <div id="profileMenuProfiles" class="profile-menu" role="listbox" hidden></div>
+                    </div>
+                  </div>
+                </div>
               </article>
 
               <article class="card">
@@ -208,48 +237,45 @@
 
             <div class="screen-grid settings-grid">
               <article class="card">
-                <h2 id="settingsAppTitle">Приложение</h2>
-                <div id="releaseMenuWrap" class="release-menu-wrap">
-                  <div class="release-menu-controls">
-                    <div class="control release-menu-toggle" id="releaseMenuToggle">
-                      <span id="releaseMenuLabel" class="release-menu-label">Release</span>
-                    </div>
-                    <button class="control profile-picker release-menu-toggle-arrow" id="releaseMenuToggleArrow" type="button" aria-haspopup="menu" aria-expanded="false">
-                      <svg class="profile-arrow release-menu-arrow" stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="20" width="20" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M6 9l6 6l6 -6"></path>
-                      </svg>
-                    </button>
-                  </div>
+                <h2 id="settingsGeneralTitle">Общие параметры</h2>
 
-                  <div id="releaseMenu" class="release-menu" role="menu" hidden>
-                    <div class="release-menu-item release-menu-item-info" role="none">
-                      <span id="releaseCurrentCaption" class="release-menu-caption">Текущий релиз</span>
-                      <a id="releaseCurrentLink" class="release-menu-value release-menu-link" href="#" target="_blank" rel="noopener noreferrer" role="menuitem">-</a>
+                <div class="field-row">
+                  <label class="field-label" id="labelReleaseMenu" for="releaseMenuToggleArrow">Версия:</label>
+                  <div class="field-control">
+                    <div id="releaseMenuWrap" class="release-menu-wrap">
+                      <div class="release-menu-controls">
+                        <div class="control release-menu-toggle" id="releaseMenuToggle">
+                          <span id="releaseMenuLabel" class="release-menu-label">Release</span>
+                        </div>
+                        <button class="control profile-picker release-menu-toggle-arrow" id="releaseMenuToggleArrow" type="button" aria-haspopup="menu" aria-expanded="false">
+                          <svg class="profile-arrow release-menu-arrow" stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="20" width="20" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 9l6 6l6 -6"></path>
+                          </svg>
+                        </button>
+                      </div>
+
+                      <div id="releaseMenu" class="release-menu" role="menu" hidden>
+                        <div class="release-menu-item release-menu-item-info" role="none">
+                          <span id="releaseCurrentCaption" class="release-menu-caption">Текущая версия</span>
+                          <a id="releaseCurrentLink" class="release-menu-value release-menu-link" href="#" target="_blank" rel="noopener noreferrer" role="menuitem">-</a>
+                        </div>
+                        <div id="releaseLatestRow" class="release-menu-item release-menu-item-info" role="none" hidden>
+                          <span id="releaseLatestCaption" class="release-menu-caption">Новая версия</span>
+                          <a id="releaseLatestLink" class="release-menu-value release-menu-link" href="#" target="_blank" rel="noopener noreferrer" role="menuitem">-</a>
+                        </div>
+                        <button id="updateAppBtn" class="release-menu-item release-menu-action" type="button" role="menuitem" hidden>Обновить приложение</button>
+                      </div>
                     </div>
-                    <div id="releaseLatestRow" class="release-menu-item release-menu-item-info" role="none" hidden>
-                      <span id="releaseLatestCaption" class="release-menu-caption">Последний релиз</span>
-                      <a id="releaseLatestLink" class="release-menu-value release-menu-link" href="#" target="_blank" rel="noopener noreferrer" role="menuitem">-</a>
-                    </div>
-                    <button id="updateAppBtn" class="release-menu-item release-menu-action" type="button" role="menuitem" hidden>Обновить приложение</button>
                   </div>
                 </div>
-              </article>
 
-              <article class="card">
-                <h2 id="settingsLangTitle">Язык</h2>
-                <div class="lang-switch">
-                  <button class="control lang-btn" id="langRu" type="button">RU</button>
-                  <button class="control lang-btn" id="langEn" type="button">EN</button>
-                </div>
-              </article>
-
-              <article class="card">
-                <h2 id="settingsRuntimeTitle">Запуск и обновления</h2>
-
-                <div class="field-row settings-autoupdate-row">
-                  <label class="field-label" id="labelAutoUpdate" for="autoUpdateHours">Автообновление (часы):</label>
-                  <div class="field-control settings-autoupdate-control">
-                    <input class="control hours-input" id="autoUpdateHours" type="number" min="0" step="1" autocomplete="off">
+                <div class="field-row">
+                  <label class="field-label" id="labelLanguage" for="langRu">Язык:</label>
+                  <div class="field-control">
+                    <div class="lang-switch">
+                      <button class="control lang-btn" id="langRu" type="button">RU</button>
+                      <button class="control lang-btn" id="langEn" type="button">EN</button>
+                    </div>
                   </div>
                 </div>
 
@@ -274,6 +300,8 @@
                 </div>
               </article>
             </div>
+
+            <div id="settingsHWIDText" class="settings-hwid-text">hwid: -</div>
           </div>
         </section>
       </div>

@@ -5,10 +5,14 @@
   var autoStartCoreInput = document.getElementById("autoStartCore");
   var startMinimizedTrayInput = document.getElementById("startMinimizedTray");
   var profileWrap = document.getElementById("profileWrap");
+  var profileWrapProfiles = document.getElementById("profileWrapProfiles");
   var profileNameInput = document.getElementById("profileNameInput");
   var profilePicker = document.getElementById("profilePicker");
+  var profilePickerProfiles = document.getElementById("profilePickerProfiles");
   var profileValueNode = document.getElementById("profileValue");
+  var profileValueProfilesNode = document.getElementById("profileValueProfiles");
   var profileMenu = document.getElementById("profileMenu");
+  var profileMenuProfiles = document.getElementById("profileMenuProfiles");
   var newProfileBtn = document.getElementById("newProfile");
   var deleteProfileBtn = document.getElementById("deleteProfile");
   var selectorBlockNode = document.getElementById("selectorBlock");
@@ -40,6 +44,7 @@
   var releaseLatestCaptionNode = document.getElementById("releaseLatestCaption");
   var releaseLatestLinkNode = document.getElementById("releaseLatestLink");
   var updateAppBtn = document.getElementById("updateAppBtn");
+  var labelReleaseMenuNode = document.getElementById("labelReleaseMenu");
   var labelUrlNode = document.getElementById("labelUrl");
   var labelVersionNode = document.getElementById("labelVersion");
   var labelAutoUpdateNode = document.getElementById("labelAutoUpdate");
@@ -72,13 +77,15 @@
   var homeProfileTitleNode = document.getElementById("homeProfileTitle");
   var profilesActionsTitleNode = document.getElementById("profilesActionsTitle");
   var labelProfileActionsNode = document.getElementById("labelProfileActions");
+  var labelProfileListNode = document.getElementById("labelProfileList");
   var profilesEditorTitleNode = document.getElementById("profilesEditorTitle");
-  var settingsAppTitleNode = document.getElementById("settingsAppTitle");
-  var settingsLangTitleNode = document.getElementById("settingsLangTitle");
-  var settingsRuntimeTitleNode = document.getElementById("settingsRuntimeTitle");
+  var settingsGeneralTitleNode = document.getElementById("settingsGeneralTitle");
+  var labelLanguageNode = document.getElementById("labelLanguage");
   var labelProfileNameNode = document.getElementById("labelProfileName");
-  var appVersionLabelNode = document.getElementById("appVersionLabel");
-  var appVersionValueNode = document.getElementById("appVersionValue");
+  var settingsHWIDTextNode = document.getElementById("settingsHWIDText");
+  var sidebarStatusLabelNode = document.getElementById("sidebarStatusLabel");
+  var sidebarThemeCycleBtn = document.getElementById("sidebarThemeCycle");
+  var sidebarThemeIconNode = document.getElementById("sidebarThemeIcon");
   var sidebarRunIndicatorNode = document.getElementById("sidebarRunIndicator");
   var screenHomeNode = document.getElementById("screenHome");
   var screenProfilesNode = document.getElementById("screenProfiles");
@@ -131,6 +138,9 @@
   var lastAppUpdateAvailable = false;
   var lastAppLatestReleaseTag = "";
   var lastAppLatestReleaseURL = "";
+  var currentThemeMode = "auto";
+  var currentThemeDark = true;
+  var lastHWID = "";
   var lastAppliedUIScale = null;
   var lastVisibilitySyncAt = 0;
   var initialStateRendered = false;
@@ -161,13 +171,17 @@
       homeProfileSection: "Профиль и селекторы",
       profileActions: "Действия профиля",
       profileActionsLabel: "Управление:",
-      profileListLabel: "Список профилей:",
+      profileListLabel: "Профиль:",
       profilesEditor: "Параметры профиля",
-      settingsApp: "Приложение",
-      settingsLanguage: "Язык",
-      settingsRuntime: "Запуск и обновления",
+      settingsGeneral: "Общие параметры",
+      languageLabel: "Язык:",
       profileName: "Имя профиля:",
-      appVersion: "Версия:",
+      hwidLabel: "hwid:",
+      sidebarStatus: "Статус",
+      releaseLabel: "Версия:",
+      themeAuto: "Авто",
+      themeLight: "Светлая",
+      themeDark: "Тёмная",
       configUrl: "Ссылка:",
       version: "Версия ядра:",
       autoUpdate: "Автообновление (часы):",
@@ -198,9 +212,9 @@
       statusLogsCleared: "Логи очищены",
       statusLogsCopied: "Логи скопированы в буфер обмена",
       profilesEmpty: "Профили отсутствуют",
-      releaseButton: "Релиз",
-      releaseCurrent: "Текущий релиз",
-      releaseLatest: "Новый релиз",
+      releaseButton: "Версия",
+      releaseCurrent: "Текущая версия",
+      releaseLatest: "Новая версия",
       releaseUnknown: "Недоступно",
       updateApp: "Обновить приложение",
       statusUpdateStarted: "Обновление приложения запущено. Окно будет перезапущено.",
@@ -220,13 +234,17 @@
       homeProfileSection: "Profile and selectors",
       profileActions: "Profile actions",
       profileActionsLabel: "Manage:",
-      profileListLabel: "Profiles list:",
+      profileListLabel: "Profile:",
       profilesEditor: "Profile settings",
-      settingsApp: "Application",
-      settingsLanguage: "Language",
-      settingsRuntime: "Startup and updates",
+      settingsGeneral: "General settings",
+      languageLabel: "Language:",
       profileName: "Profile name:",
-      appVersion: "Version:",
+      hwidLabel: "hwid:",
+      sidebarStatus: "Status",
+      releaseLabel: "Version:",
+      themeAuto: "Auto",
+      themeLight: "Light",
+      themeDark: "Dark",
       configUrl: "Config URL:",
       version: "Core version:",
       autoUpdate: "Auto-update (hours):",
@@ -257,9 +275,9 @@
       statusLogsCleared: "Logs cleared",
       statusLogsCopied: "Logs copied to clipboard",
       profilesEmpty: "No profiles",
-      releaseButton: "Release",
-      releaseCurrent: "Current release",
-      releaseLatest: "New release",
+      releaseButton: "Version",
+      releaseCurrent: "Current version",
+      releaseLatest: "New version",
       releaseUnknown: "Unavailable",
       updateApp: "Update app",
       statusUpdateStarted: "Application update started. The app will restart shortly.",
@@ -366,6 +384,103 @@
     var v = String(raw || "").toLowerCase();
     if (v === "en") return "en";
     return "ru";
+  }
+
+  function normalizeThemeMode(raw) {
+    var v = String(raw || "").toLowerCase().trim();
+    if (v === "light" || v === "dark" || v === "auto") return v;
+    return "auto";
+  }
+
+  function themeModeLabel(mode) {
+    var normalized = normalizeThemeMode(mode);
+    if (normalized === "light") return tr("themeLight");
+    if (normalized === "dark") return tr("themeDark");
+    return tr("themeAuto");
+  }
+
+  function applyThemeAppearance() {
+    if (!document || !document.body) return;
+    var cls = String(document.body.className || "");
+    cls = cls
+      .replace(/\btheme-light\b/g, " ")
+      .replace(/\btheme-dark\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    cls = (cls ? cls + " " : "") + (currentThemeDark ? "theme-dark" : "theme-light");
+    document.body.className = cls;
+  }
+
+  function setSidebarThemeIcon(mode) {
+    if (!sidebarThemeIconNode) return;
+    var normalized = normalizeThemeMode(mode);
+    var viewBox = "0 0 24 24";
+    var path = "";
+    if (normalized === "auto") {
+      viewBox = "0 -960 960 960";
+      path = "M396-396q-32-32-58.5-67T289-537q-5 14-6.5 28.5T281-480q0 83 58 141t141 58q14 0 28.5-2t28.5-6q-39-22-74-48.5T396-396Zm57-56q51 51 114 87.5T702-308q-40 51-98 79.5T481-200q-117 0-198.5-81.5T201-480q0-65 28.5-123t79.5-98q20 72 56.5 135T453-452Zm290 72q-20-5-39.5-11T665-405q8-18 11.5-36.5T680-480q0-83-58.5-141.5T480-680q-20 0-38.5 3.5T405-665q-8-19-13.5-38T381-742q24-9 49-13.5t51-4.5q117 0 198.5 81.5T761-480q0 26-4.5 51T743-380ZM440-840v-120h80v120h-80Zm0 840v-120h80V0h-80Zm323-706-57-57 85-84 57 56-85 85ZM169-113l-57-56 85-85 57 57-85 84Zm671-327v-80h120v80H840ZM0-440v-80h120v80H0Zm791 328-85-85 57-57 84 85-56 57ZM197-706l-84-85 56-57 85 85-57 57Zm199 310Z";
+    } else if (normalized === "light") {
+      viewBox = "0 -960 960 960";
+      path = "M440-80v-166L308-114l-56-56 132-132H218v-80h166L252-514l56-56 132 132v-166h80v166l132-132 56 56-132 132h166v80H676l132 132-56 56-132-132v166h-80Zm40-200q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z";
+    } else {
+      viewBox = "0 -960 960 960";
+      path = "M484-80q-84 0-157-32T197-197q-53-53-85-126.5T80-480q0-84 32-157t85-126.5q53-53 126.5-85T480-880q16 0 31.5 1.5T543-874q-55 33-89 89t-34 125q0 96 67 163t163 67q69 0 125-34t89-89q3 15 4.5 30.5T870-480q0 84-32 157t-85 126.5q-53 53-126.5 84.5T484-80Z";
+    }
+    sidebarThemeIconNode.setAttribute("viewBox", viewBox);
+    var node = sidebarThemeIconNode.getElementsByTagName("path")[0];
+    if (node) {
+      node.setAttribute("d", path);
+      return;
+    }
+    sidebarThemeIconNode.innerHTML = '<path d="' + path + '" fill="currentColor"></path>';
+  }
+
+  function applyThemeModeControls() {
+    if (sidebarThemeCycleBtn) {
+      sidebarThemeCycleBtn.title = themeModeLabel(currentThemeMode);
+      sidebarThemeCycleBtn.setAttribute("aria-label", themeModeLabel(currentThemeMode));
+    }
+    setSidebarThemeIcon(currentThemeMode);
+  }
+
+  function setThemeMode(nextMode, persist) {
+    var normalized = normalizeThemeMode(nextMode);
+    if (normalized === currentThemeMode && !persist) {
+      return;
+    }
+
+    currentThemeMode = normalized;
+    if (currentThemeMode === "light") {
+      currentThemeDark = false;
+    } else if (currentThemeMode === "dark") {
+      currentThemeDark = true;
+    }
+    applyThemeAppearance();
+    applyThemeModeControls();
+
+    if (!persist) {
+      return;
+    }
+
+    api("POST", "/api/state", { theme_mode: currentThemeMode }, function (err, state) {
+      if (err) {
+        setStatus(tr("errorPrefix") + err.message);
+        return;
+      }
+      renderState(state);
+    });
+  }
+
+  function cycleThemeMode() {
+    if (currentThemeMode === "auto") {
+      setThemeMode("light", true);
+      return;
+    }
+    if (currentThemeMode === "light") {
+      setThemeMode("dark", true);
+      return;
+    }
+    setThemeMode("auto", true);
   }
 
   function normalizeAutoUpdateHours(raw) {
@@ -489,13 +604,7 @@
     });
   }
 
-  function renderAppVersion(value) {
-    if (!appVersionValueNode) return;
-    var shown = String(value || "").trim();
-    if (!shown) shown = "-";
-    appVersionValueNode.textContent = shown;
-    appVersionValueNode.title = shown;
-  }
+  function renderAppVersion(value) {}
 
   function renderSidebarStatus() {
     if (!sidebarRunIndicatorNode) return;
@@ -526,12 +635,13 @@
     if (homeProfileTitleNode) homeProfileTitleNode.textContent = tr("homeProfileSection");
     if (profilesActionsTitleNode) profilesActionsTitleNode.textContent = tr("profileActions");
     if (labelProfileActionsNode) labelProfileActionsNode.textContent = tr("profileActionsLabel");
+    if (labelProfileListNode) labelProfileListNode.textContent = tr("profileListLabel");
     if (profilesEditorTitleNode) profilesEditorTitleNode.textContent = tr("profilesEditor");
-    if (settingsAppTitleNode) settingsAppTitleNode.textContent = tr("settingsApp");
-    if (settingsLangTitleNode) settingsLangTitleNode.textContent = tr("settingsLanguage");
-    if (settingsRuntimeTitleNode) settingsRuntimeTitleNode.textContent = tr("settingsRuntime");
+    if (settingsGeneralTitleNode) settingsGeneralTitleNode.textContent = tr("settingsGeneral");
+    if (labelLanguageNode) labelLanguageNode.textContent = tr("languageLabel");
     if (labelProfileNameNode) labelProfileNameNode.textContent = tr("profileName");
-    if (appVersionLabelNode) appVersionLabelNode.textContent = tr("appVersion");
+    if (labelReleaseMenuNode) labelReleaseMenuNode.textContent = tr("releaseLabel");
+    if (sidebarStatusLabelNode) sidebarStatusLabelNode.textContent = tr("sidebarStatus");
     if (labelUrlNode) labelUrlNode.textContent = tr("configUrl");
     if (labelVersionNode) labelVersionNode.textContent = tr("version");
     if (labelAutoUpdateNode) labelAutoUpdateNode.textContent = tr("autoUpdate");
@@ -583,6 +693,10 @@
     if (mobileActionsToggleBtn) {
       mobileActionsToggleBtn.setAttribute("aria-label", tr("actionsMenu"));
     }
+    if (settingsHWIDTextNode) {
+      settingsHWIDTextNode.textContent = tr("hwidLabel") + " " + (lastHWID || "-");
+    }
+    applyThemeModeControls();
     renderSelectorGroups(selectorGroups);
     setLogsFilterValidation(logsFilterError);
   }
@@ -770,8 +884,14 @@
     if (profileValueNode) {
       profileValueNode.textContent = selectedProfile || "-";
     }
+    if (profileValueProfilesNode) {
+      profileValueProfilesNode.textContent = selectedProfile || "-";
+    }
     if (profilePicker) {
       profilePicker.title = selectedProfile || "";
+    }
+    if (profilePickerProfiles) {
+      profilePickerProfiles.title = selectedProfile || "";
     }
     if (profileNameInput) {
       if (document.activeElement !== profileNameInput || (!profileRenameInFlight && !profileRenameTimer)) {
@@ -805,38 +925,70 @@
 
   function renderProfileMenu() {
     renderProfileMenuNode(profileMenu);
+    renderProfileMenuNode(profileMenuProfiles);
+  }
+
+  function getProfileMenuKind(kind) {
+    return String(kind || "").toLowerCase() === "profiles" ? "profiles" : "home";
+  }
+
+  function getProfileMenuTargets(kind) {
+    var resolvedKind = getProfileMenuKind(kind);
+    if (resolvedKind === "profiles") {
+      if (!profileWrapProfiles || !profilePickerProfiles || !profileMenuProfiles) return null;
+      return {
+        wrap: profileWrapProfiles,
+        picker: profilePickerProfiles,
+        menu: profileMenuProfiles,
+        kind: "profiles"
+      };
+    }
+
+    if (!profileWrap || !profilePicker || !profileMenu) return null;
+    return {
+      wrap: profileWrap,
+      picker: profilePicker,
+      menu: profileMenu,
+      kind: "home"
+    };
   }
 
   function openProfileMenu(kind) {
-    if (!profileMenu || !profilePicker) return;
+    var targets = getProfileMenuTargets(kind);
+    if (!targets) return;
     closeProfileMenu();
     renderProfileMenu();
-    profileMenu.hidden = false;
-    profileMenu.scrollTop = 0;
-    profilePicker.className = "control profile-picker open";
-    profilePicker.setAttribute("aria-expanded", "true");
+    targets.menu.hidden = false;
+    targets.menu.scrollTop = 0;
+    targets.picker.className = "control profile-picker open";
+    targets.picker.setAttribute("aria-expanded", "true");
     profileMenuOpened = true;
-    openedProfileMenuKind = "";
+    openedProfileMenuKind = targets.kind;
   }
 
   function closeProfileMenu() {
-    if (profileMenu) {
-      profileMenu.hidden = true;
-    }
-    if (profilePicker) {
-      profilePicker.className = "control profile-picker";
-      profilePicker.setAttribute("aria-expanded", "false");
+    var allTargets = [
+      getProfileMenuTargets("home"),
+      getProfileMenuTargets("profiles")
+    ];
+    for (var i = 0; i < allTargets.length; i++) {
+      var targets = allTargets[i];
+      if (!targets) continue;
+      targets.menu.hidden = true;
+      targets.picker.className = "control profile-picker";
+      targets.picker.setAttribute("aria-expanded", "false");
     }
     profileMenuOpened = false;
     openedProfileMenuKind = "";
   }
 
   function toggleProfileMenu(kind) {
-    if (profileMenuOpened) {
+    var requestedKind = getProfileMenuKind(kind);
+    if (profileMenuOpened && openedProfileMenuKind === requestedKind) {
       closeProfileMenu();
       return;
     }
-    openProfileMenu(kind);
+    openProfileMenu(requestedKind);
   }
 
   function isConfirmModalOpen() {
@@ -890,10 +1042,7 @@
       toast.className += " visible";
     }, 10);
 
-    var ttl = parseInt(ttlMs, 10);
-    if (isNaN(ttl) || ttl < 1200) {
-      ttl = tone === "error" ? 3600 : 2400;
-    }
+    var ttl = 3000;
 
     setTimeout(function () {
       if (!toast || !toast.parentNode) return;
@@ -1421,11 +1570,7 @@
         return;
       }
       renderState(state);
-      setStatus(tr("statusConfigOk"));
       showToast("success", tr("statusConfigOk"));
-      setTimeout(function () {
-        renderDefaultStatus(lastProtoWarn);
-      }, 1500);
     });
   }
 
@@ -1475,7 +1620,7 @@
         updateAppBtn.disabled = true;
       }
       setStatus(tr("statusUpdateStarted"));
-      showToast("success", tr("statusUpdateStarted"), 4200);
+      showToast("success", tr("statusUpdateStarted"), 3000);
     });
   }
 
@@ -1494,6 +1639,15 @@
     var prevSelectorGroupsKey = selectorGroupsRenderKey;
 
     currentLanguage = normalizeLanguage(state.language || currentLanguage);
+    currentThemeMode = normalizeThemeMode(state.theme_mode || currentThemeMode);
+    if (typeof state.theme_dark === "boolean") {
+      currentThemeDark = !!state.theme_dark;
+    } else {
+      currentThemeDark = currentThemeMode === "dark" ? true : (currentThemeMode === "light" ? false : currentThemeDark);
+    }
+    lastHWID = String(state.hwid || "").trim();
+    applyThemeAppearance();
+    applyThemeModeControls();
 
     var active = state.current_profile || "";
     var profiles = state.profiles || [];
@@ -1555,6 +1709,9 @@
     lastAppUpdateAvailable = !!state.app_update_available;
     lastAppLatestReleaseTag = String(state.app_latest_release_tag || "").trim();
     lastAppLatestReleaseURL = String(state.app_latest_release_url || "").trim();
+    if (settingsHWIDTextNode) {
+      settingsHWIDTextNode.textContent = tr("hwidLabel") + " " + (lastHWID || "-");
+    }
     renderAppVersion(lastAppReleaseTag);
     renderSelectorGroups(nextSelectorGroups);
     if (startStopBtn) {
@@ -2178,6 +2335,25 @@
     };
   }
 
+  if (profilePickerProfiles) {
+    profilePickerProfiles.onclick = function () {
+      toggleProfileMenu("profiles");
+    };
+
+    profilePickerProfiles.onkeydown = function (e) {
+      var key = e.key || "";
+      if (key === "Enter" || key === " " || key === "ArrowDown") {
+        if (e.preventDefault) e.preventDefault();
+        openProfileMenu("profiles");
+        return;
+      }
+      if (key === "Escape") {
+        if (e.preventDefault) e.preventDefault();
+        closeProfileMenu();
+      }
+    };
+  }
+
   if (releaseMenuToggleBtn && releaseMenuToggleBtn.tagName === "BUTTON") {
     releaseMenuToggleBtn.onclick = function () {
       toggleReleaseMenu();
@@ -2229,7 +2405,8 @@
   document.addEventListener("mousedown", function (e) {
     var target = e.target || e.srcElement;
     if (profileMenuOpened) {
-      var insideProfile = !!(profileWrap && profileWrap.contains && profileWrap.contains(target));
+      var activeTargets = getProfileMenuTargets(openedProfileMenuKind || "home");
+      var insideProfile = !!(activeTargets && activeTargets.wrap && activeTargets.wrap.contains && activeTargets.wrap.contains(target));
       if (!insideProfile) {
         closeProfileMenu();
       }
@@ -2340,6 +2517,12 @@
       if (pickerNode) {
         var pickerSelector = String(pickerNode.getAttribute("data-selector") || "").trim();
         if (!pickerSelector || pickerNode.disabled) return;
+        var normalizedPickerSelector = pickerSelector.toLowerCase();
+        var normalizedOpenedSelector = String(selectorMenuOpenName || "").trim().toLowerCase();
+        if (normalizedOpenedSelector && normalizedOpenedSelector === normalizedPickerSelector) {
+          closeSelectorMenu();
+          return;
+        }
         openSelectorMenu(pickerSelector);
       }
     });
@@ -2354,6 +2537,12 @@
     if (currentLanguage === "en") return;
     setLanguage("en", true);
   };
+
+  if (sidebarThemeCycleBtn) {
+    sidebarThemeCycleBtn.onclick = function () {
+      cycleThemeMode();
+    };
+  }
 
   if (profileNameInput) {
     profileNameInput.oninput = scheduleProfileRename;
@@ -2485,6 +2674,8 @@
 
   // Always perform first sync to remove loading veil even if window was
   // initially hidden by the host before first show.
+  applyThemeAppearance();
+  applyThemeModeControls();
   lastVisibilitySyncAt = Date.now();
   syncStateAndLogs(true);
   if (!document.hidden) {

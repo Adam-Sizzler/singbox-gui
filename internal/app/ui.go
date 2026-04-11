@@ -58,10 +58,18 @@ func (a *App) runUI() error {
 	a.debugf("ui: runUI started")
 
 	a.systemDark = detectSystemDarkTheme()
-	setPreferredAppTheme(a.systemDark)
 	startupCfg := a.getConfigSnapshot()
+	startupThemeMode := normalizeThemeMode(startupCfg.ThemeMode)
+	startupThemeDark := resolveThemeDark(startupThemeMode, a.systemDark)
+	setPreferredAppTheme(startupThemeDark)
 	startMinimizedToTray := startupCfg.StartMinimizedToTray && strings.TrimSpace(a.startupImport) == ""
-	a.debugf("ui: systemDark=%v startMinimizedToTray=%v", a.systemDark, startMinimizedToTray)
+	a.debugf(
+		"ui: systemDark=%v themeMode=%s themeDark=%v startMinimizedToTray=%v",
+		a.systemDark,
+		startupThemeMode,
+		startupThemeDark,
+		startMinimizedToTray,
+	)
 
 	uiHTML, err := loadEmbeddedUIHTML()
 	if err != nil {
@@ -154,7 +162,7 @@ func (a *App) runUI() error {
 		a.log("WARN: не удалось инициализировать иконку трея: %v", err)
 		startMinimizedToTray = false
 	}
-	a.applyNativeDarkHints(a.systemDark)
+	a.applyNativeDarkHints(startupThemeDark)
 	a.hideMainWindow()
 
 	a.debugf("ui: loading embedded HTML into webview")
@@ -1367,12 +1375,17 @@ func (a *App) startSystemThemeWatcher() {
 			case <-stop:
 				return
 			case <-ticker.C:
+				cfg := a.getConfigSnapshot()
+				if normalizeThemeMode(cfg.ThemeMode) != "auto" {
+					continue
+				}
+
 				dark := detectSystemDarkTheme()
 				if dark == a.systemDark {
 					continue
 				}
 				a.systemDark = dark
-				a.applyNativeDarkHints(dark)
+				a.applyNativeDarkHints(resolveThemeDark(cfg.ThemeMode, dark))
 				if dark {
 					a.log("Системная тема: Dark")
 				} else {

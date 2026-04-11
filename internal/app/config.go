@@ -14,6 +14,7 @@ import (
 
 const (
 	defaultAppLanguage   = "ru"
+	defaultThemeMode     = "auto"
 	defaultAutoUpdateHrs = 12
 	maxAutoUpdateHours   = 24 * 365
 )
@@ -33,6 +34,7 @@ type AppConfig struct {
 	AutoStartCore        bool              `yaml:"auto_start_core,omitempty"`
 	StartMinimizedToTray bool              `yaml:"start_minimized_to_tray,omitempty"`
 	Language             string            `yaml:"language,omitempty"`
+	ThemeMode            string            `yaml:"theme_mode,omitempty"`
 	CurrentProfile       string            `yaml:"current_profile,omitempty"`
 	Profiles             []ConfigProfile   `yaml:"profiles,omitempty"`
 	SingboxEnv           map[string]string `yaml:"singbox-env,omitempty"`
@@ -43,6 +45,7 @@ type appConfigPersist struct {
 	AutoStartCore        bool              `yaml:"auto_start_core"`
 	StartMinimizedToTray bool              `yaml:"start_minimized_to_tray"`
 	Language             string            `yaml:"language"`
+	ThemeMode            string            `yaml:"theme_mode"`
 	CurrentProfile       string            `yaml:"current_profile"`
 	Profiles             []ConfigProfile   `yaml:"profiles"`
 	SingboxEnv           map[string]string `yaml:"singbox-env,omitempty"`
@@ -56,6 +59,7 @@ func (c AppConfig) MarshalYAML() (interface{}, error) {
 		AutoStartCore:        cfg.AutoStartCore,
 		StartMinimizedToTray: cfg.StartMinimizedToTray,
 		Language:             cfg.Language,
+		ThemeMode:            cfg.ThemeMode,
 		CurrentProfile:       cfg.CurrentProfile,
 		Profiles:             cfg.Profiles,
 		SingboxEnv:           cfg.SingboxEnv,
@@ -124,6 +128,7 @@ func defaultAppConfig() AppConfig {
 	cfg := AppConfig{
 		AutoUpdateHours: defaultAutoUpdateHrs,
 		Language:        defaultAppLanguage,
+		ThemeMode:       defaultThemeMode,
 		CurrentProfile:  "default",
 		SingboxEnv:      cloneEnvMap(defaultSingBoxEnv),
 		Profiles: []ConfigProfile{
@@ -144,6 +149,7 @@ func normalizeConfigProfiles(cfg *AppConfig) {
 	}
 	cfg.AutoUpdateHours = normalizeAutoUpdateHours(cfg.AutoUpdateHours)
 	cfg.Language = normalizeAppLanguage(cfg.Language)
+	cfg.ThemeMode = normalizeThemeMode(cfg.ThemeMode)
 	cfg.SingboxEnv = normalizeSingboxEnv(cfg.SingboxEnv)
 
 	if len(cfg.Profiles) == 0 {
@@ -295,6 +301,7 @@ func syncLegacyFromCurrent(cfg *AppConfig) {
 		return
 	}
 	cfg.Language = normalizeAppLanguage(cfg.Language)
+	cfg.ThemeMode = normalizeThemeMode(cfg.ThemeMode)
 	if len(cfg.Profiles) == 0 {
 		cfg.URL = ""
 		cfg.Version = "latest"
@@ -367,6 +374,30 @@ func normalizeAppLanguage(raw string) string {
 		return "ru"
 	default:
 		return defaultAppLanguage
+	}
+}
+
+func normalizeThemeMode(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "light":
+		return "light"
+	case "dark":
+		return "dark"
+	case "auto":
+		return "auto"
+	default:
+		return defaultThemeMode
+	}
+}
+
+func resolveThemeDark(mode string, systemDark bool) bool {
+	switch normalizeThemeMode(mode) {
+	case "light":
+		return false
+	case "dark":
+		return true
+	default:
+		return systemDark
 	}
 }
 

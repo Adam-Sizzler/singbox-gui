@@ -136,6 +136,9 @@ type AppState struct {
 	CurrentProfile      string               `json:"current_profile"`
 	Profiles            []ConfigProfile      `json:"profiles"`
 	Language            string               `json:"language"`
+	ThemeMode           string               `json:"theme_mode"`
+	ThemeDark           bool                 `json:"theme_dark"`
+	HWID                string               `json:"hwid"`
 	URL                 string               `json:"url"`
 	Version             string               `json:"version"`
 	SelectorGroups      []SelectorGroupState `json:"selector_groups,omitempty"`
@@ -202,6 +205,8 @@ func (a *App) snapshotState() AppState {
 	cfg := a.getConfigSnapshot()
 	active := activeProfileFromConfig(cfg)
 	running := a.isProcessRunning()
+	themeMode := normalizeThemeMode(cfg.ThemeMode)
+	themeDark := resolveThemeDark(themeMode, a.systemDark)
 
 	a.runMu.Lock()
 	busy := a.runningAction
@@ -214,6 +219,9 @@ func (a *App) snapshotState() AppState {
 		CurrentProfile:      cfg.CurrentProfile,
 		Profiles:            cloneConfigProfiles(cfg.Profiles),
 		Language:            cfg.Language,
+		ThemeMode:           themeMode,
+		ThemeDark:           themeDark,
+		HWID:                appHWID(),
 		URL:                 active.URL,
 		Version:             active.Version,
 		SelectorGroups:      selectorGroups,
@@ -236,6 +244,7 @@ func (a *App) snapshotState() AppState {
 type StatePatch struct {
 	CurrentProfile       *string `json:"current_profile"`
 	Language             *string `json:"language"`
+	ThemeMode            *string `json:"theme_mode"`
 	URL                  *string `json:"url"`
 	Version              *string `json:"version"`
 	AutoUpdateHours      *int    `json:"auto_update_hours"`
@@ -246,6 +255,7 @@ type StatePatch struct {
 func (a *App) applyStatePatch(p StatePatch) error {
 	cfg := a.getConfigSnapshot()
 	normalizeConfigProfiles(&cfg)
+	themeModeChanged := false
 
 	if p.CurrentProfile != nil {
 		name := sanitizeProfileName(*p.CurrentProfile)
@@ -260,6 +270,10 @@ func (a *App) applyStatePatch(p StatePatch) error {
 
 	if p.Language != nil {
 		cfg.Language = normalizeAppLanguage(*p.Language)
+	}
+	if p.ThemeMode != nil {
+		cfg.ThemeMode = normalizeThemeMode(*p.ThemeMode)
+		themeModeChanged = true
 	}
 	if p.AutoUpdateHours != nil {
 		cfg.AutoUpdateHours = normalizeAutoUpdateHours(*p.AutoUpdateHours)
@@ -290,6 +304,10 @@ func (a *App) applyStatePatch(p StatePatch) error {
 	syncLegacyFromCurrent(&cfg)
 	if err := a.persistConfig(cfg); err != nil {
 		return err
+	}
+	if themeModeChanged {
+		a.systemDark = detectSystemDarkTheme()
+		a.applyNativeDarkHints(resolveThemeDark(cfg.ThemeMode, a.systemDark))
 	}
 	return nil
 }
