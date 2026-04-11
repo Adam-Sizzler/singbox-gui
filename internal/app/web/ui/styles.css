@@ -1,8 +1,8 @@
 :root {
-  --ui-bg: #2b2b2b;
+  --ui-bg: #313131;
   --ui-surface: #1f1f1f;
   --ui-surface-2: #232323;
-  --ui-panel: #2b2b2b;
+  --ui-panel: #383838;
   --ui-border: #3a3a3a;
   --ui-muted: #a8a8a8;
   --ui-text: #f3f3f3;
@@ -19,6 +19,10 @@
   --ui-sidebar-nav-width: 68px;
   --ui-sidebar-nav-height: 42px;
   --ui-sidebar-nav-radius: 999px;
+  --ui-panel-outline: #1f1f1f;
+  --ui-sidebar-control-bg: #1f1f1f;
+  --ui-sidebar-control-hover: #272727;
+  --ui-sidebar-control-active: #171717;
 }
 
 html,
@@ -36,10 +40,10 @@ body {
 }
 
 body.theme-light {
-  --ui-bg: #f1f2f4;
+  --ui-bg: #e4e8ee;
   --ui-surface: #ffffff;
   --ui-surface-2: #f7f7f8;
-  --ui-panel: #f5f6f8;
+  --ui-panel: #edf1f5;
   --ui-border: #d6d8dd;
   --ui-muted: #5f6470;
   --ui-text: #1e222c;
@@ -47,6 +51,10 @@ body.theme-light {
   --ui-accent-text: #222222;
   --ui-accent-hover: #e7c146;
   --ui-accent-active: #d9b63f;
+  --ui-panel-outline: #ffffff;
+  --ui-sidebar-control-bg: #ffffff;
+  --ui-sidebar-control-hover: #ffffff;
+  --ui-sidebar-control-active: #ffffff;
 }
 
 * {
@@ -75,9 +83,9 @@ body.ui-loading .app-shell {
   flex: 0 0 var(--ui-sidebar-width);
   height: 100%;
   min-height: 0;
-  padding: 10px 8px;
+  padding: 14px;
   border-right: none;
-  background: var(--ui-panel);
+  background: transparent;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -94,7 +102,7 @@ body.ui-loading .app-shell {
 
 .sidebar-brand {
   border-radius: var(--ui-sidebar-nav-radius);
-  background: #1f1f1f;
+  background: var(--ui-sidebar-control-bg);
   border: 1px solid rgba(255, 255, 255, 0.08);
   height: var(--ui-sidebar-nav-height);
   min-height: var(--ui-sidebar-nav-height);
@@ -187,7 +195,7 @@ body.ui-loading .app-shell {
   height: var(--ui-sidebar-nav-height);
   border: none;
   border-radius: var(--ui-sidebar-nav-radius);
-  background: #1f1f1f;
+  background: var(--ui-sidebar-control-bg);
   color: var(--ui-text);
   cursor: pointer;
   display: flex;
@@ -201,11 +209,11 @@ body.ui-loading .app-shell {
 }
 
 .sidebar-nav-btn:hover {
-  background: #272727;
+  background: var(--ui-sidebar-control-hover);
 }
 
 .sidebar-nav-btn:active {
-  background: #171717;
+  background: var(--ui-sidebar-control-active);
 }
 
 .sidebar-nav-btn.active {
@@ -244,23 +252,23 @@ body.ui-loading .app-shell {
 }
 
 .sidebar-theme-cycle {
-  width: 42px;
-  min-width: 42px;
-  max-width: 42px;
-  height: 42px;
-  line-height: 42px;
+  width: var(--ui-sidebar-nav-width);
+  min-width: var(--ui-sidebar-nav-width);
+  max-width: var(--ui-sidebar-nav-width);
+  height: var(--ui-sidebar-nav-height);
+  line-height: var(--ui-sidebar-nav-height);
   padding: 0;
-  border-radius: 12px !important;
-  background: #1f1f1f !important;
+  border-radius: var(--ui-sidebar-nav-radius) !important;
+  background: var(--ui-sidebar-control-bg) !important;
   color: var(--ui-text) !important;
 }
 
 .sidebar-theme-cycle:hover {
-  background: #272727 !important;
+  background: var(--ui-sidebar-control-hover) !important;
 }
 
 .sidebar-theme-cycle:active {
-  background: #171717 !important;
+  background: var(--ui-sidebar-control-active) !important;
 }
 
 .sidebar-theme-cycle svg {
@@ -277,7 +285,7 @@ body.ui-loading .app-shell {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: 8mm;
+  padding: 4mm 4mm 4mm 0;
 }
 
 .content-frame {
@@ -305,6 +313,7 @@ body.ui-loading .app-shell {
   min-height: 0;
   margin: 0;
   border-radius: 12px;
+  border: 1px solid var(--ui-panel-outline);
   background: var(--ui-panel);
   padding: 10px;
   overflow: hidden;
@@ -1222,43 +1231,109 @@ input.logs-filter::placeholder {
 }
 
 body.theme-light .sidebar {
-  background: var(--ui-panel);
+  background: transparent;
 }
 
-body.theme-light .sidebar-brand,
-body.theme-light .sidebar-nav-btn,
-body.theme-light .sidebar-theme-cycle,
 body.theme-light .profile-menu,
 body.theme-light .release-menu,
 body.theme-light #logs,
 body.theme-light .confirm-modal-dialog,
 body.theme-light .toast {
   background: #ffffff !important;
-  border-color: rgba(0, 0, 0, 0.1);
+  border-color: #ffffff;
+}
+
+body.theme-light .sidebar-brand,
+body.theme-light .sidebar-nav-btn,
+body.theme-light .sidebar-theme-cycle {
+  background: var(--ui-sidebar-control-bg) !important;
+}
+
+body.theme-light .sidebar-nav-btn:hover,
+body.theme-light .sidebar-theme-cycle:hover {
+  background: var(--ui-sidebar-control-hover) !important;
+}
+
+body.theme-light .sidebar-nav-btn:active,
+body.theme-light .sidebar-theme-cycle:active {
+  background: var(--ui-sidebar-control-active) !important;
 }
 
 body.theme-light .sidebar-nav-btn.active,
 body.theme-light .sidebar-nav-btn.active:hover,
 body.theme-light .sidebar-nav-btn.active:active {
-  background: var(--ui-accent) !important;
-  color: var(--ui-accent-text) !important;
+  background: #ffffff !important;
+  color: var(--ui-text) !important;
 }
 
-body.theme-light .sidebar-nav-btn:hover,
-body.theme-light .sidebar-theme-cycle:hover,
 body.theme-light button.control:hover {
-  background: #eceff3 !important;
+  background: #ffffff !important;
 }
 
-body.theme-light .sidebar-nav-btn:active,
-body.theme-light .sidebar-theme-cycle:active,
 body.theme-light button.control:active {
-  background: #e4e8ed !important;
+  background: #ffffff !important;
 }
 
 body.theme-light .profile-option:hover,
 body.theme-light .profile-option.active {
   background: #eceff3;
+}
+
+body.theme-light .sidebar-nav-item.active .sidebar-nav-text {
+  color: var(--ui-accent);
+  font-weight: 700;
+}
+
+body.theme-light .sidebar-brand,
+body.theme-light .profile-menu,
+body.theme-light .release-menu,
+body.theme-light #logs,
+body.theme-light .confirm-modal-dialog,
+body.theme-light .toast {
+  border-color: #ffffff;
+}
+
+body.theme-light #profilePicker,
+body.theme-light #profilePickerProfiles,
+body.theme-light #newProfile,
+body.theme-light #deleteProfile,
+body.theme-light #checkConfig,
+body.theme-light #startStop,
+body.theme-light #clearLogs,
+body.theme-light #copyLogs,
+body.theme-light #releaseMenuToggle,
+body.theme-light #releaseMenuToggleArrow,
+body.theme-light #langRu,
+body.theme-light #langEn {
+  background: #ffffff !important;
+  color: var(--ui-text) !important;
+}
+
+body.theme-light #profilePicker:hover,
+body.theme-light #profilePickerProfiles:hover,
+body.theme-light #newProfile:hover,
+body.theme-light #deleteProfile:hover,
+body.theme-light #checkConfig:hover,
+body.theme-light #startStop:hover,
+body.theme-light #clearLogs:hover,
+body.theme-light #copyLogs:hover,
+body.theme-light #langRu:hover,
+body.theme-light #langEn:hover,
+body.theme-light #releaseMenuToggleArrow:hover,
+body.theme-light #releaseMenuToggle:hover,
+body.theme-light #profilePicker:active,
+body.theme-light #profilePickerProfiles:active,
+body.theme-light #newProfile:active,
+body.theme-light #deleteProfile:active,
+body.theme-light #checkConfig:active,
+body.theme-light #startStop:active,
+body.theme-light #clearLogs:active,
+body.theme-light #copyLogs:active,
+body.theme-light #langRu:active,
+body.theme-light #langEn:active,
+body.theme-light #releaseMenuToggleArrow:active,
+body.theme-light #releaseMenuToggle:active {
+  background: #ffffff !important;
 }
 
 .confirm-modal {
@@ -1434,11 +1509,11 @@ body::-webkit-scrollbar-thumb:hover,
   }
 
   .content-area {
-    padding: 8mm;
+    padding: 4mm 4mm 4mm 0;
   }
 
   .panel {
-    padding: 8px;
+    padding: 10px;
   }
 
   .card {
