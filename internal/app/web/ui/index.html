@@ -12,49 +12,56 @@
     <aside class="sidebar">
       <div class="sidebar-brand">
         <div class="sidebar-brand-title">
-          <span id="sidebarBrandTitleFull">singbox-gui</span>
-          <span id="sidebarBrandTitleShort">sb-gui</span>
+          <span id="sidebarBrandTitle">singbox-gui</span>
         </div>
         <span id="sidebarRunIndicator" class="sidebar-run-indicator" aria-hidden="true"></span>
       </div>
 
       <nav class="sidebar-nav" aria-label="Main Navigation">
-        <button id="navHomeBtn" class="sidebar-nav-btn active" data-screen="home" type="button" aria-current="page">
-          <span class="sidebar-nav-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" focusable="false">
-              <path d="M3 10.6L12 3l9 7.6v9.4a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1v-9.4z" fill="currentColor"></path>
-            </svg>
-          </span>
-          <span id="navHomeLabel" class="sidebar-nav-label">Home</span>
-        </button>
+        <div class="sidebar-nav-item">
+          <div class="sidebar-nav-text" id="navHomeText">Home</div>
+          <button id="navHomeBtn" class="sidebar-nav-btn active" data-screen="home" type="button" aria-current="page">
+            <span class="sidebar-nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" focusable="false">
+                <path d="M3 10.6L12 3l9 7.6v9.4a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1v-9.4z" fill="currentColor"></path>
+              </svg>
+            </span>
+          </button>
+        </div>
 
-        <button id="navProfilesBtn" class="sidebar-nav-btn" data-screen="profiles" type="button">
-          <span class="sidebar-nav-icon" aria-hidden="true">
-            <svg viewBox="0 -960 960 960" xmlns="http://www.w3.org/2000/svg" focusable="false">
-              <path d="M80-160v-160h160v160H80Zm240 0v-160h560v160H320ZM80-400v-160h160v160H80Zm240 0v-160h560v160H320ZM80-640v-160h160v160H80Zm240 0v-160h560v160H320Z" fill="currentColor"></path>
-            </svg>
-          </span>
-          <span id="navProfilesLabel" class="sidebar-nav-label">Profiles</span>
-        </button>
+        <div class="sidebar-nav-item">
+          <div class="sidebar-nav-text" id="navProfilesText">Profiles</div>
+          <button id="navProfilesBtn" class="sidebar-nav-btn" data-screen="profiles" type="button">
+            <span class="sidebar-nav-icon" aria-hidden="true">
+              <svg viewBox="0 -960 960 960" xmlns="http://www.w3.org/2000/svg" focusable="false">
+                <path d="M80-160v-160h160v160H80Zm240 0v-160h560v160H320ZM80-400v-160h160v160H80Zm240 0v-160h560v160H320ZM80-640v-160h160v160H80Zm240 0v-160h560v160H320Z" fill="currentColor"></path>
+              </svg>
+            </span>
+          </button>
+        </div>
 
-        <button id="navLogsBtn" class="sidebar-nav-btn" data-screen="logs" type="button">
-          <span class="sidebar-nav-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" focusable="false">
-              <path d="M6 3h9l3 3v15a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3zm8 1.5V8h3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-              <path d="M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-            </svg>
-          </span>
-          <span id="navLogsLabel" class="sidebar-nav-label">Logs</span>
-        </button>
+        <div class="sidebar-nav-item">
+          <div class="sidebar-nav-text" id="navLogsText">Logs</div>
+          <button id="navLogsBtn" class="sidebar-nav-btn" data-screen="logs" type="button">
+            <span class="sidebar-nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" focusable="false">
+                <path d="M6 3h9l3 3v15a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3zm8 1.5V8h3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+              </svg>
+            </span>
+          </button>
+        </div>
 
-        <button id="navSettingsBtn" class="sidebar-nav-btn" data-screen="settings" type="button">
-          <span class="sidebar-nav-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" focusable="false">
-              <path d="M19.4 13.5a7.9 7.9 0 0 0 .1-1.5 7.9 7.9 0 0 0-.1-1.5l2-1.6-1.9-3.2-2.4 1a7.2 7.2 0 0 0-2.6-1.5L14.1 2h-4.2l-.4 3.2a7.2 7.2 0 0 0-2.6 1.5l-2.4-1-1.9 3.2 2 1.6a7.9 7.9 0 0 0-.1 1.5 7.9 7.9 0 0 0 .1 1.5l-2 1.6 1.9 3.2 2.4-1a7.2 7.2 0 0 0 2.6 1.5l.4 3.2h4.2l.4-3.2a7.2 7.2 0 0 0 2.6-1.5l2.4 1 1.9-3.2-2-1.6zM12 15.2a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4z" fill="currentColor"></path>
-            </svg>
-          </span>
-          <span id="navSettingsLabel" class="sidebar-nav-label">Settings</span>
-        </button>
+        <div class="sidebar-nav-item">
+          <div class="sidebar-nav-text" id="navSettingsText">Settings</div>
+          <button id="navSettingsBtn" class="sidebar-nav-btn" data-screen="settings" type="button">
+            <span class="sidebar-nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" focusable="false">
+                <path d="M19.4 13.5a7.9 7.9 0 0 0 .1-1.5 7.9 7.9 0 0 0-.1-1.5l2-1.6-1.9-3.2-2.4 1a7.2 7.2 0 0 0-2.6-1.5L14.1 2h-4.2l-.4 3.2a7.2 7.2 0 0 0-2.6 1.5l-2.4-1-1.9 3.2 2 1.6a7.9 7.9 0 0 0-.1 1.5 7.9 7.9 0 0 0 .1 1.5l-2 1.6 1.9 3.2 2.4-1a7.2 7.2 0 0 0 2.6 1.5l.4 3.2h4.2l.4-3.2a7.2 7.2 0 0 0 2.6-1.5l2.4 1 1.9-3.2-2-1.6zM12 15.2a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4z" fill="currentColor"></path>
+              </svg>
+            </span>
+          </button>
+        </div>
       </nav>
 
       <div class="sidebar-meta">
@@ -137,7 +144,7 @@
             </div>
 
             <div class="screen-grid profiles-grid">
-              <article class="card profiles-list-card">
+              <article class="card">
                 <h2 id="profilesActionsTitle">Действия профиля</h2>
 
                 <div class="field-row">
@@ -146,25 +153,6 @@
                     <div class="profiles-toolbar">
                       <button class="control" id="newProfile" type="button">Новый</button>
                       <button class="control" id="deleteProfile" type="button">Удалить</button>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="field-row profiles-selector-row">
-                  <label class="field-label" id="labelProfilesSelector" for="profilePickerProfiles">Список профилей:</label>
-                  <div class="field-control">
-                    <div class="profile-picker-wrap" id="profileWrapProfiles">
-                      <div class="profile-name-group">
-                        <div class="control profile-value-box" id="profileValueProfilesBox">
-                          <span id="profileValueProfiles" class="profile-value">-</span>
-                        </div>
-                        <button class="control profile-picker" id="profilePickerProfiles" type="button" aria-haspopup="listbox" aria-expanded="false">
-                          <svg class="profile-arrow" stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="20" width="20" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6 9l6 6l6 -6"></path>
-                          </svg>
-                        </button>
-                      </div>
-                      <div id="profileMenuProfiles" class="profile-menu" role="listbox" hidden></div>
                     </div>
                   </div>
                 </div>

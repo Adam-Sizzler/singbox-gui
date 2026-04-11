@@ -9,10 +9,6 @@
   var profilePicker = document.getElementById("profilePicker");
   var profileValueNode = document.getElementById("profileValue");
   var profileMenu = document.getElementById("profileMenu");
-  var profileWrapProfiles = document.getElementById("profileWrapProfiles");
-  var profilePickerProfiles = document.getElementById("profilePickerProfiles");
-  var profileValueProfilesNode = document.getElementById("profileValueProfiles");
-  var profileMenuProfiles = document.getElementById("profileMenuProfiles");
   var newProfileBtn = document.getElementById("newProfile");
   var deleteProfileBtn = document.getElementById("deleteProfile");
   var selectorBlockNode = document.getElementById("selectorBlock");
@@ -66,10 +62,10 @@
   var navProfilesBtn = document.getElementById("navProfilesBtn");
   var navLogsBtn = document.getElementById("navLogsBtn");
   var navSettingsBtn = document.getElementById("navSettingsBtn");
-  var navHomeLabelNode = document.getElementById("navHomeLabel");
-  var navProfilesLabelNode = document.getElementById("navProfilesLabel");
-  var navLogsLabelNode = document.getElementById("navLogsLabel");
-  var navSettingsLabelNode = document.getElementById("navSettingsLabel");
+  var navHomeText = document.getElementById("navHomeText");
+  var navProfilesText = document.getElementById("navProfilesText");
+  var navLogsText = document.getElementById("navLogsText");
+  var navSettingsText = document.getElementById("navSettingsText");
   var homeTitleNode = document.getElementById("homeTitle");
   var profilesTitleNode = document.getElementById("profilesTitle");
   var homeActionsTitleNode = document.getElementById("homeActionsTitle");
@@ -81,7 +77,6 @@
   var settingsLangTitleNode = document.getElementById("settingsLangTitle");
   var settingsRuntimeTitleNode = document.getElementById("settingsRuntimeTitle");
   var labelProfileNameNode = document.getElementById("labelProfileName");
-  var labelProfilesSelectorNode = document.getElementById("labelProfilesSelector");
   var appVersionLabelNode = document.getElementById("appVersionLabel");
   var appVersionValueNode = document.getElementById("appVersionValue");
   var sidebarRunIndicatorNode = document.getElementById("sidebarRunIndicator");
@@ -457,6 +452,10 @@
         } else {
           item.nav.removeAttribute("aria-current");
         }
+        var parentItem = item.nav.parentNode;
+        if (parentItem) {
+          parentItem.className = isActive ? "sidebar-nav-item active" : "sidebar-nav-item";
+        }
       }
     }
   }
@@ -493,7 +492,7 @@
   function renderAppVersion(value) {
     if (!appVersionValueNode) return;
     var shown = String(value || "").trim();
-    if (!shown) shown = tr("releaseUnknown");
+    if (!shown) shown = "-";
     appVersionValueNode.textContent = shown;
     appVersionValueNode.title = shown;
   }
@@ -515,10 +514,10 @@
 
   function applyLanguageUI() {
     document.documentElement.lang = currentLanguage;
-    if (navHomeLabelNode) navHomeLabelNode.textContent = tr("home");
-    if (navProfilesLabelNode) navProfilesLabelNode.textContent = tr("profiles");
-    if (navLogsLabelNode) navLogsLabelNode.textContent = tr("logs");
-    if (navSettingsLabelNode) navSettingsLabelNode.textContent = tr("settings");
+    if (navHomeText) navHomeText.textContent = tr("home");
+    if (navProfilesText) navProfilesText.textContent = tr("profiles");
+    if (navLogsText) navLogsText.textContent = tr("logs");
+    if (navSettingsText) navSettingsText.textContent = tr("settings");
     if (homeTitleNode) homeTitleNode.textContent = tr("home");
     if (profilesTitleNode) profilesTitleNode.textContent = tr("profiles");
     if (settingsTitleNode) settingsTitleNode.textContent = tr("settings");
@@ -532,7 +531,6 @@
     if (settingsLangTitleNode) settingsLangTitleNode.textContent = tr("settingsLanguage");
     if (settingsRuntimeTitleNode) settingsRuntimeTitleNode.textContent = tr("settingsRuntime");
     if (labelProfileNameNode) labelProfileNameNode.textContent = tr("profileName");
-    if (labelProfilesSelectorNode) labelProfilesSelectorNode.textContent = tr("profileListLabel");
     if (appVersionLabelNode) appVersionLabelNode.textContent = tr("appVersion");
     if (labelUrlNode) labelUrlNode.textContent = tr("configUrl");
     if (labelVersionNode) labelVersionNode.textContent = tr("version");
@@ -772,14 +770,8 @@
     if (profileValueNode) {
       profileValueNode.textContent = selectedProfile || "-";
     }
-    if (profileValueProfilesNode) {
-      profileValueProfilesNode.textContent = selectedProfile || "-";
-    }
     if (profilePicker) {
       profilePicker.title = selectedProfile || "";
-    }
-    if (profilePickerProfiles) {
-      profilePickerProfiles.title = selectedProfile || "";
     }
     if (profileNameInput) {
       if (document.activeElement !== profileNameInput || (!profileRenameInFlight && !profileRenameTimer)) {
@@ -813,33 +805,18 @@
 
   function renderProfileMenu() {
     renderProfileMenuNode(profileMenu);
-    renderProfileMenuNode(profileMenuProfiles);
-  }
-
-  function getProfileMenuNodes(kind) {
-    if (kind === "profiles") {
-      return {
-        menu: profileMenuProfiles,
-        picker: profilePickerProfiles
-      };
-    }
-    return {
-      menu: profileMenu,
-      picker: profilePicker
-    };
   }
 
   function openProfileMenu(kind) {
-    var nodes = getProfileMenuNodes(kind);
-    if (!nodes.menu || !nodes.picker) return;
+    if (!profileMenu || !profilePicker) return;
     closeProfileMenu();
     renderProfileMenu();
-    nodes.menu.hidden = false;
-    nodes.menu.scrollTop = 0;
-    nodes.picker.className = "control profile-picker open";
-    nodes.picker.setAttribute("aria-expanded", "true");
+    profileMenu.hidden = false;
+    profileMenu.scrollTop = 0;
+    profilePicker.className = "control profile-picker open";
+    profilePicker.setAttribute("aria-expanded", "true");
     profileMenuOpened = true;
-    openedProfileMenuKind = kind === "profiles" ? "profiles" : "home";
+    openedProfileMenuKind = "";
   }
 
   function closeProfileMenu() {
@@ -850,24 +827,16 @@
       profilePicker.className = "control profile-picker";
       profilePicker.setAttribute("aria-expanded", "false");
     }
-    if (profileMenuProfiles) {
-      profileMenuProfiles.hidden = true;
-    }
-    if (profilePickerProfiles) {
-      profilePickerProfiles.className = "control profile-picker";
-      profilePickerProfiles.setAttribute("aria-expanded", "false");
-    }
     profileMenuOpened = false;
     openedProfileMenuKind = "";
   }
 
   function toggleProfileMenu(kind) {
-    var normalized = kind === "profiles" ? "profiles" : "home";
-    if (profileMenuOpened && openedProfileMenuKind === normalized) {
+    if (profileMenuOpened) {
       closeProfileMenu();
       return;
     }
-    openProfileMenu(normalized);
+    openProfileMenu(kind);
   }
 
   function isConfirmModalOpen() {
@@ -2209,25 +2178,6 @@
     };
   }
 
-  if (profilePickerProfiles) {
-    profilePickerProfiles.onclick = function () {
-      toggleProfileMenu("profiles");
-    };
-
-    profilePickerProfiles.onkeydown = function (e) {
-      var key = e.key || "";
-      if (key === "Enter" || key === " " || key === "ArrowDown") {
-        if (e.preventDefault) e.preventDefault();
-        openProfileMenu("profiles");
-        return;
-      }
-      if (key === "Escape") {
-        if (e.preventDefault) e.preventDefault();
-        closeProfileMenu();
-      }
-    };
-  }
-
   if (releaseMenuToggleBtn && releaseMenuToggleBtn.tagName === "BUTTON") {
     releaseMenuToggleBtn.onclick = function () {
       toggleReleaseMenu();
@@ -2279,9 +2229,8 @@
   document.addEventListener("mousedown", function (e) {
     var target = e.target || e.srcElement;
     if (profileMenuOpened) {
-      var insideHomeProfile = !!(profileWrap && profileWrap.contains && profileWrap.contains(target));
-      var insideProfilesProfile = !!(profileWrapProfiles && profileWrapProfiles.contains && profileWrapProfiles.contains(target));
-      if (!insideHomeProfile && !insideProfilesProfile) {
+      var insideProfile = !!(profileWrap && profileWrap.contains && profileWrap.contains(target));
+      if (!insideProfile) {
         closeProfileMenu();
       }
     }
