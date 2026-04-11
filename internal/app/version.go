@@ -7,7 +7,10 @@ import (
 	"strings"
 )
 
-const appReleaseBaseURL = "https://github.com/Adam-Sizzler/singbox-gui/releases/tag/"
+const (
+	appReleaseBaseURL = "https://github.com/Adam-Sizzler/singbox-wrapper/releases/tag/"
+	appUserAgentBase  = "sfw"
+)
 
 // appReleaseTag is injected at build time via -ldflags -X.
 var appReleaseTag = "dev"
@@ -26,4 +29,12 @@ func currentAppReleaseURL() string {
 		return ""
 	}
 	return appReleaseBaseURL + url.PathEscape(tag)
+}
+
+func appUserAgent() string {
+	tag := currentAppReleaseTag()
+	if tag == "" {
+		return appUserAgentBase
+	}
+	return appUserAgentBase + "/" + tag
 }

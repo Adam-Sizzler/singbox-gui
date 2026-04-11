@@ -36,7 +36,7 @@ func fetchLatestVersion() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", appUserAgent())
 
 	client := &http.Client{Timeout: 20 * time.Second}
 	resp, err := client.Do(req)
@@ -89,7 +89,7 @@ func downloadAndInstallSingBox(version, targetExe string) error {
 	)
 
 	zipPath := targetExe + ".zip"
-	if err := downloadFile(downloadURL, zipPath, map[string]string{"User-Agent": userAgent}); err != nil {
+	if err := downloadFile(downloadURL, zipPath, map[string]string{"User-Agent": appUserAgent()}); err != nil {
 		return fmt.Errorf("не удалось скачать sing-box %s: %w", version, err)
 	}
 	defer os.Remove(zipPath)
@@ -103,7 +103,7 @@ func downloadAndInstallSingBox(version, targetExe string) error {
 func downloadRuntimeConfig(url, target string) (bool, error) {
 	targetName := filepath.Base(target)
 	tmpPath := target + ".download.tmp"
-	if err := downloadFile(url, tmpPath, map[string]string{"User-Agent": userAgent}); err != nil {
+	if err := downloadFile(url, tmpPath, map[string]string{"User-Agent": appUserAgent()}); err != nil {
 		return false, fmt.Errorf("не удалось скачать %s: %w", targetName, err)
 	}
 	defer os.Remove(tmpPath)
@@ -163,8 +163,8 @@ func ensureLocalRuntimeConfig(target string) error {
 }
 
 func validateRemoteRuntimeConfig(url string) error {
-	tmpPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-gui-config-check-%d.json", time.Now().UnixNano()))
-	if err := downloadFile(url, tmpPath, map[string]string{"User-Agent": userAgent}); err != nil {
+	tmpPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-wrapper-config-check-%d.json", time.Now().UnixNano()))
+	if err := downloadFile(url, tmpPath, map[string]string{"User-Agent": appUserAgent()}); err != nil {
 		return fmt.Errorf("не удалось скачать runtime-конфиг: %w", err)
 	}
 	defer os.Remove(tmpPath)

@@ -137,7 +137,7 @@ func (a *App) runUI() error {
 	}
 
 	a.debugf("ui: configuring host window title/size")
-	if err := a.web.SetTitle("Sing-box GUI"); err != nil {
+	if err := a.web.SetTitle("singbox-wrapper"); err != nil {
 		a.debugf("ui: SetTitle failed: %v", err)
 		return err
 	}
@@ -1136,7 +1136,7 @@ func (a *App) ensureTrayOwnerWindow() error {
 	}
 	a.debugf("ui: creating tray owner window")
 
-	owner, err := walk.NewMainWindowWithName("singbox-gui-tray-owner")
+	owner, err := walk.NewMainWindowWithName("singbox-wrapper-tray-owner")
 	if err != nil {
 		return err
 	}
@@ -1149,7 +1149,7 @@ func (a *App) ensureTrayOwnerWindow() error {
 		owner.Dispose()
 		return err
 	}
-	if err := owner.SetTitle("Sing-box GUI"); err != nil {
+	if err := owner.SetTitle("singbox-wrapper"); err != nil {
 		owner.Dispose()
 		return err
 	}
@@ -1218,7 +1218,7 @@ func (a *App) initNotifyIcon() error {
 	if icon := a.loadMainWindowIcon(); icon != nil {
 		_ = ni.SetIcon(icon)
 	}
-	_ = ni.SetToolTip("Sing-box GUI")
+	_ = ni.SetToolTip("singbox-wrapper")
 	if err := ni.SetVisible(true); err != nil {
 		_ = ni.Dispose()
 		return err

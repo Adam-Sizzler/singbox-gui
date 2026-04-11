@@ -15,7 +15,7 @@ func Run(args []string) {
 	defer func() {
 		if r := recover(); r != nil {
 			msg := fmt.Sprintf("[%s] panic: %v\n\n%s", time.Now().Format("2006-01-02 15:04:05"), r, debug.Stack())
-			fallbackPath := filepath.Join(os.TempDir(), "singbox-gui-fatal.log")
+			fallbackPath := filepath.Join(os.TempDir(), "singbox-wrapper-fatal.log")
 			_ = os.WriteFile(fallbackPath, []byte(msg), 0600)
 			showError("Fatal panic", msg)
 		}

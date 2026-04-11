@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	appReleaseLatestAPIURL       = "https://api.github.com/repos/Adam-Sizzler/singbox-gui/releases/latest"
+	appReleaseLatestAPIURL       = "https://api.github.com/repos/Adam-Sizzler/singbox-wrapper/releases/latest"
 	appReleaseBinaryAssetName    = "singbox-gui.exe"
 	appReleaseCheckInterval      = 12 * time.Hour
 	appReleaseCheckErrorInterval = 10 * time.Minute
@@ -92,7 +92,7 @@ func fetchLatestAppReleaseInfo() (appReleaseInfo, error) {
 	if err != nil {
 		return appReleaseInfo{}, err
 	}
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", appUserAgent())
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
@@ -188,7 +188,7 @@ func (a *App) updateApplicationAction() error {
 		_ = os.Remove(nextExe)
 
 		a.log("Скачивание обновления приложения: %s", latest.displayTag)
-		if err := downloadFile(latest.assetURL, nextExe, map[string]string{"User-Agent": userAgent}); err != nil {
+		if err := downloadFile(latest.assetURL, nextExe, map[string]string{"User-Agent": appUserAgent()}); err != nil {
 			return fmt.Errorf("не удалось скачать обновление приложения: %w", err)
 		}
 
@@ -236,7 +236,7 @@ func launchSelfUpdateScript(targetExe, sourceExe string) error {
 }
 
 func writeSelfUpdateLauncherVBScript(scriptPath, source, target string) (string, error) {
-	launcherPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-gui-self-update-launcher-%d.vbs", time.Now().UnixNano()))
+	launcherPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-wrapper-self-update-launcher-%d.vbs", time.Now().UnixNano()))
 
 	cmdLine := fmt.Sprintf(`cmd.exe /C ""%s" "%s" "%s""`, scriptPath, source, target)
 	escapedCmdLine := strings.ReplaceAll(cmdLine, `"`, `""`)
@@ -256,7 +256,7 @@ func writeSelfUpdateLauncherVBScript(scriptPath, source, target string) (string,
 }
 
 func writeSelfUpdateScript() (string, error) {
-	scriptPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-gui-self-update-%d.cmd", time.Now().UnixNano()))
+	scriptPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-wrapper-self-update-%d.cmd", time.Now().UnixNano()))
 	script := strings.Join([]string{
 		"@echo off",
 		"setlocal EnableExtensions",

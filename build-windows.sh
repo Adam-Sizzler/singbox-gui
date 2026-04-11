@@ -17,6 +17,11 @@ if [ -z "$release_tag" ]; then
   fi
 fi
 if [ -z "$release_tag" ]; then
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    release_tag="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+  fi
+fi
+if [ -z "$release_tag" ]; then
   release_tag="dev"
 fi
 release_tag="$(printf '%s' "$release_tag" | tr -d '\r\n')"

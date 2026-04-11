@@ -1,8 +1,9 @@
-# Sing-box GUI Client (Windows)
+# singbox-wrapper (Windows)
 
 Native Windows GUI client for `sing-box` with portable runtime behavior.
 
 Russian version: `README.ru.md`
+Repository: `https://github.com/Adam-Sizzler/singbox-wrapper`
 
 ## Features
 
@@ -10,8 +11,12 @@ Russian version: `README.ru.md`
 - Embedded UI assets (frontend is built into the binary)
 - Config stored near executable (`config.yaml`)
 - Downloads `sing-box.exe` by selected version (`latest` or semver)
-- Downloads runtime `config.json` from subscription URL (`User-Agent: sfw`)
+- Downloads runtime `config.json` from subscription URL (`User-Agent: sfw/<app-version>`, for example `sfw/v26.4.12`)
 - Process control from UI (`Start` / `Stop`)
+- App release block in UI:
+  - shows current app version
+  - shows latest release version (if newer is available)
+  - provides one-click self-update with app restart
 - `selector`/`outbound` switching from UI via Clash API (no core restart)
 - ANSI-aware colored log rendering in UI
 - Multiple profiles (`create`, `select`, `delete`)
@@ -91,9 +96,16 @@ Supported URI format:
 sing-box://import-remote-profile?url=https%3A%2F%2Fexample.com%2Fsub#profile-name
 ```
 
+Import with explicit core version:
+
+```text
+sing-box://import-remote-profile?url=https%3A%2F%2Fexample.com%2Fsub&version=1.12.0#profile-name
+```
+
 Behavior:
 
 - `url` is required and must be `http://` or `https://`
+- optional query parameter `version` sets imported core version (`latest` by default)
 - if `#profile-name` exists:
   - update that profile URL if it exists, or create profile
   - switch current profile to it
@@ -115,20 +127,3 @@ The app only replaces `config.json` if the downloaded content is valid JSON.
 - If runtime config contains outbound groups of type `selector`, the UI shows selector dropdowns.
 - While the core is running, switching is done live via `PUT /proxies/{selector}` (Clash API), without process restart.
 - The selected outbound is saved per profile (`selector_selections`) and applied automatically on next core start.
-
-## GitHub Actions
-
-Workflow: `.github/workflows/build-windows-on-tag.yml`
-
-- Trigger: push of any tag
-- Result: uploaded artifact `singbox-gui-windows-<tag>`
-
-## Repository Hygiene
-
-Recommended ignored local artifacts:
-
-- built exe
-- runtime files (`config.yaml`, `config.json`, `sing-box.exe`)
-- temporary logs
-
-`.gitignore` is included for this.

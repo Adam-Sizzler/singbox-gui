@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	instanceMutexName     = `Local\singbox-gui-instance-mutex`
-	instanceActivateName  = `Local\singbox-gui-instance-activate`
+	instanceMutexName     = `Local\singbox-wrapper-instance-mutex`
+	instanceActivateName  = `Local\singbox-wrapper-instance-activate`
 	instancePayloadFile   = ".instance-activate.json"
 	instanceWaitTimeoutMS = uint32(350)
 	instanceShutdownWait  = 2 * time.Second

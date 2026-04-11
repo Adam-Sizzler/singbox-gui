@@ -727,7 +727,7 @@
     var normalizedLink = String(link || "").trim();
     var normalizedLatestTag = String(latestTag || "").trim();
     var normalizedLatestLink = String(latestLink || "").trim();
-    var releasesRoot = "https://github.com/Adam-Sizzler/singbox-gui/releases";
+    var releasesRoot = "https://github.com/Adam-Sizzler/singbox-wrapper/releases";
     var updateAvailable = !!hasUpdate;
     var showLatest = updateAvailable && normalizedLatestTag !== "" && normalizedLatestTag !== normalizedTag;
 
