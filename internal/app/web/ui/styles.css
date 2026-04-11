@@ -179,6 +179,7 @@ body.ui-loading .app-shell {
 .sidebar-nav-text {
   order: 2;
   font-size: 13px;
+  font-weight: 700;
   color: var(--ui-muted);
   text-align: center;
   white-space: nowrap;
@@ -467,6 +468,7 @@ button.control:disabled {
 #copyLogs,
 #releaseMenuToggle,
 #releaseMenuToggleArrow,
+#updateAppBtn,
 #langRu,
 #langEn {
   background: var(--ui-accent) !important;
@@ -485,6 +487,7 @@ button.control:disabled {
 #langRu:hover,
 #langEn:hover,
 #releaseMenuToggleArrow:hover,
+#updateAppBtn:hover,
 #releaseMenuToggle:hover {
   background: var(--ui-accent-hover) !important;
 }
@@ -500,6 +503,7 @@ button.control:disabled {
 #langRu:active,
 #langEn:active,
 #releaseMenuToggleArrow:active,
+#updateAppBtn:active,
 #releaseMenuToggle:active {
   background: var(--ui-accent-active) !important;
 }
@@ -1263,16 +1267,17 @@ body.theme-light .sidebar-theme-cycle:active {
 body.theme-light .sidebar-nav-btn.active,
 body.theme-light .sidebar-nav-btn.active:hover,
 body.theme-light .sidebar-nav-btn.active:active {
-  background: #ffffff !important;
-  color: var(--ui-text) !important;
+  background: var(--ui-accent) !important;
+  color: var(--ui-accent-text) !important;
+  font-weight: 700;
 }
 
-body.theme-light button.control:hover {
-  background: #ffffff !important;
+body.theme-light button.control:not(.sidebar-nav-btn):not(.sidebar-theme-cycle):hover {
+  background: var(--ui-accent-hover) !important;
 }
 
-body.theme-light button.control:active {
-  background: #ffffff !important;
+body.theme-light button.control:not(.sidebar-nav-btn):not(.sidebar-theme-cycle):active {
+  background: var(--ui-accent-active) !important;
 }
 
 body.theme-light .profile-option:hover,
@@ -1304,10 +1309,11 @@ body.theme-light #clearLogs,
 body.theme-light #copyLogs,
 body.theme-light #releaseMenuToggle,
 body.theme-light #releaseMenuToggleArrow,
+body.theme-light #updateAppBtn,
 body.theme-light #langRu,
 body.theme-light #langEn {
-  background: #ffffff !important;
-  color: var(--ui-text) !important;
+  background: var(--ui-accent) !important;
+  color: var(--ui-accent-text) !important;
 }
 
 body.theme-light #profilePicker:hover,
@@ -1321,7 +1327,11 @@ body.theme-light #copyLogs:hover,
 body.theme-light #langRu:hover,
 body.theme-light #langEn:hover,
 body.theme-light #releaseMenuToggleArrow:hover,
-body.theme-light #releaseMenuToggle:hover,
+body.theme-light #updateAppBtn:hover,
+body.theme-light #releaseMenuToggle:hover {
+  background: var(--ui-accent-hover) !important;
+}
+
 body.theme-light #profilePicker:active,
 body.theme-light #profilePickerProfiles:active,
 body.theme-light #newProfile:active,
@@ -1333,8 +1343,9 @@ body.theme-light #copyLogs:active,
 body.theme-light #langRu:active,
 body.theme-light #langEn:active,
 body.theme-light #releaseMenuToggleArrow:active,
+body.theme-light #updateAppBtn:active,
 body.theme-light #releaseMenuToggle:active {
-  background: #ffffff !important;
+  background: var(--ui-accent-active) !important;
 }
 
 .confirm-modal {

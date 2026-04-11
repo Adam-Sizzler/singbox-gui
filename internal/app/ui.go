@@ -1059,6 +1059,10 @@ func setWindowCompositionDarkColors(hwnd win.HWND, dark bool) {
 	_, _, _ = procSetWindowCompAttr.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&data)))
 }
 
+func rgbToColorRef(r, g, b uint32) uint32 {
+	return (b << 16) | (g << 8) | r
+}
+
 func setImmersiveDarkMode(hwnd win.HWND, dark bool) {
 	var value int32
 	if dark {
@@ -1080,8 +1084,12 @@ func setImmersiveDarkMode(hwnd win.HWND, dark bool) {
 	text := uint32(dwmColorDefault)
 	border := uint32(dwmColorDefault)
 	if dark {
-		caption = 0x00202020
-		text = 0x00F3F3F3
+		caption = rgbToColorRef(0x31, 0x31, 0x31)
+		text = rgbToColorRef(0xF3, 0xF3, 0xF3)
+		border = dwmColorNone
+	} else {
+		caption = rgbToColorRef(0xE4, 0xE8, 0xEE)
+		text = rgbToColorRef(0x1E, 0x22, 0x2C)
 		border = dwmColorNone
 	}
 	_, _, _ = proc.Call(uintptr(hwnd), uintptr(dwmwaCaptionColor), uintptr(unsafe.Pointer(&caption)), unsafe.Sizeof(caption))
