@@ -37,8 +37,6 @@ const (
 	uiReadyFallbackTimeout = 5 * time.Second
 	gclpHICON              = int32(-14)
 	gclpHICONSM            = int32(-34)
-	mainWindowInitWidth    = 1080
-	mainWindowInitHeight   = 700
 	mainWindowMinWidth     = 920
 	mainWindowMinHeight    = 600
 	mainWindowMaxWidth     = 1480
@@ -143,7 +141,7 @@ func (a *App) runUI() error {
 		a.debugf("ui: SetTitle failed: %v", err)
 		return err
 	}
-	if err := a.web.SetSize(mainWindowInitWidth, mainWindowInitHeight, webview.HintNone); err != nil {
+	if err := a.web.SetSize(mainWindowMinWidth, mainWindowMinHeight, webview.HintNone); err != nil {
 		a.debugf("ui: SetSize initial failed: %v", err)
 		return err
 	}
@@ -1088,7 +1086,7 @@ func setImmersiveDarkMode(hwnd win.HWND, dark bool) {
 		text = rgbToColorRef(0xF3, 0xF3, 0xF3)
 		border = dwmColorNone
 	} else {
-		caption = rgbToColorRef(0xE4, 0xE8, 0xEE)
+		caption = rgbToColorRef(0xD9, 0xDE, 0xE6)
 		text = rgbToColorRef(0x1E, 0x22, 0x2C)
 		border = dwmColorNone
 	}

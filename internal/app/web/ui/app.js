@@ -2354,24 +2354,6 @@
     };
   }
 
-  if (releaseMenuToggleBtn && releaseMenuToggleBtn.tagName === "BUTTON") {
-    releaseMenuToggleBtn.onclick = function () {
-      toggleReleaseMenu();
-    };
-    releaseMenuToggleBtn.onkeydown = function (e) {
-      var key = e.key || "";
-      if (key === "Enter" || key === " " || key === "ArrowDown") {
-        if (e.preventDefault) e.preventDefault();
-        openReleaseMenu();
-        return;
-      }
-      if (key === "Escape") {
-        if (e.preventDefault) e.preventDefault();
-        closeReleaseMenu();
-      }
-    };
-  }
-
   if (releaseMenuToggleArrowBtn) {
     releaseMenuToggleArrowBtn.onclick = function () {
       toggleReleaseMenu();
@@ -2387,12 +2369,6 @@
         if (e.preventDefault) e.preventDefault();
         closeReleaseMenu();
       }
-    };
-  }
-
-  if (releaseMenuWrap) {
-    releaseMenuWrap.onmouseleave = function () {
-      closeReleaseMenu();
     };
   }
 
