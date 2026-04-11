@@ -45,6 +45,14 @@
   --ui-sidebar-control-bg: #1f1f1f;
   --ui-sidebar-control-hover: #272727;
   --ui-sidebar-control-active: #171717;
+  --ui-start-btn-bg: #2f7a45;
+  --ui-start-btn-text: #f2f7f2;
+  --ui-start-btn-hover: #296c3d;
+  --ui-start-btn-active: #235e34;
+  --ui-stop-btn-bg: #8d3a3a;
+  --ui-stop-btn-text: #fff2f2;
+  --ui-stop-btn-hover: #7f3333;
+  --ui-stop-btn-active: #702d2d;
 }
 
 html,
@@ -150,21 +158,21 @@ body.ui-loading .app-shell {
   width: calc(11 * var(--ui-px));
   height: calc(11 * var(--ui-px));
   border-radius: 50%;
-  background: #e65454;
-  box-shadow: 0 0 0 calc(2 * var(--ui-px)) rgba(230, 84, 84, 0.24);
+  background: var(--ui-stop-btn-bg);
+  box-shadow: 0 0 0 calc(2 * var(--ui-px)) rgba(141, 58, 58, 0.24);
   transition: background-color 0.12s ease, box-shadow 0.12s ease;
   flex: 0 0 auto;
 }
 
 .sidebar-run-indicator.running {
-  background: #00ffff;
-  box-shadow: 0 0 0 calc(2 * var(--ui-px)) rgba(0, 255, 255, 0.28);
+  background: var(--ui-start-btn-bg);
+  box-shadow: 0 0 0 calc(2 * var(--ui-px)) rgba(47, 122, 69, 0.3);
   animation: sidebarRunPulse 1.2s infinite ease-in-out;
 }
 
 .sidebar-run-indicator.busy {
-  background: #00ffff;
-  box-shadow: 0 0 0 calc(2 * var(--ui-px)) rgba(0, 255, 255, 0.28);
+  background: var(--ui-start-btn-bg);
+  box-shadow: 0 0 0 calc(2 * var(--ui-px)) rgba(47, 122, 69, 0.3);
   animation: sidebarRunPulse 1.2s infinite ease-in-out;
 }
 
@@ -483,7 +491,6 @@ button.control:disabled {
 #newProfile,
 #deleteProfile,
 #checkConfig,
-#startStop,
 #clearLogs,
 #copyLogs,
 #releaseMenuToggle,
@@ -500,7 +507,6 @@ button.control:disabled {
 #newProfile:hover,
 #deleteProfile:hover,
 #checkConfig:hover,
-#startStop:hover,
 #clearLogs:hover,
 #copyLogs:hover,
 #langRu:hover,
@@ -515,7 +521,6 @@ button.control:disabled {
 #newProfile:active,
 #deleteProfile:active,
 #checkConfig:active,
-#startStop:active,
 #clearLogs:active,
 #copyLogs:active,
 #langRu:active,
@@ -686,6 +691,29 @@ button.control:disabled {
 #startStop {
   position: relative;
   padding-left: var(--ui-space-3);
+  background: var(--ui-start-btn-bg) !important;
+  color: var(--ui-start-btn-text) !important;
+}
+
+#startStop:hover {
+  background: var(--ui-start-btn-hover) !important;
+}
+
+#startStop:active {
+  background: var(--ui-start-btn-active) !important;
+}
+
+#startStop.core-running {
+  background: var(--ui-stop-btn-bg) !important;
+  color: var(--ui-stop-btn-text) !important;
+}
+
+#startStop.core-running:hover {
+  background: var(--ui-stop-btn-hover) !important;
+}
+
+#startStop.core-running:active {
+  background: var(--ui-stop-btn-active) !important;
 }
 
 .uptime {
@@ -1334,7 +1362,6 @@ body.theme-light #profilePickerProfiles,
 body.theme-light #newProfile,
 body.theme-light #deleteProfile,
 body.theme-light #checkConfig,
-body.theme-light #startStop,
 body.theme-light #clearLogs,
 body.theme-light #copyLogs,
 body.theme-light #releaseMenuToggle,
@@ -1350,7 +1377,6 @@ body.theme-light #profilePickerProfiles:hover,
 body.theme-light #newProfile:hover,
 body.theme-light #deleteProfile:hover,
 body.theme-light #checkConfig:hover,
-body.theme-light #startStop:hover,
 body.theme-light #clearLogs:hover,
 body.theme-light #copyLogs:hover,
 body.theme-light #langRu:hover,
@@ -1365,7 +1391,6 @@ body.theme-light #profilePickerProfiles:active,
 body.theme-light #newProfile:active,
 body.theme-light #deleteProfile:active,
 body.theme-light #checkConfig:active,
-body.theme-light #startStop:active,
 body.theme-light #clearLogs:active,
 body.theme-light #copyLogs:active,
 body.theme-light #langRu:active,

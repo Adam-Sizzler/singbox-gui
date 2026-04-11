@@ -1,8 +1,9 @@
-# Sing-box GUI Client (Windows)
+# singbox-wrapper (Windows)
 
 Нативный Windows GUI-клиент для `sing-box` с portable-логикой.
 
 English version: `README.md`
+Репозиторий: `https://github.com/Adam-Sizzler/singbox-wrapper`
 
 ## Возможности
 
@@ -10,8 +11,12 @@ English version: `README.md`
 - Фронтенд встроен в бинарник
 - Конфиг хранится рядом с `.exe` (`config.yaml`)
 - Загрузка `sing-box.exe` по выбранной версии (`latest` или semver)
-- Загрузка runtime-файла `config.json` по URL (`User-Agent: sfw`)
+- Загрузка runtime-файла `config.json` по URL (`User-Agent: sfw/<версия-приложения>`, например `sfw/v26.4.12`)
 - Управление процессом из UI (`Start` / `Stop`)
+- Блок релиза приложения в UI:
+  - показывает текущую версию приложения
+  - показывает версию последнего релиза (если доступна новая)
+  - кнопка автообновления скачивает релиз и перезапускает приложение
 - Переключение `selector`/`outbound` из UI через Clash API (без рестарта ядра)
 - Цветной вывод логов в UI с поддержкой ANSI
 - Профили (`создать`, `выбрать`, `удалить`)
@@ -91,9 +96,16 @@ profiles:
 sing-box://import-remote-profile?url=https%3A%2F%2Fexample.com%2Fsub#profile-name
 ```
 
+Импорт с явной версией ядра:
+
+```text
+sing-box://import-remote-profile?url=https%3A%2F%2Fexample.com%2Fsub&version=1.12.0#profile-name
+```
+
 Поведение:
 
 - параметр `url` обязателен и должен быть `http://` или `https://`
+- необязательный параметр `version` задает версию ядра для импортируемого профиля (`latest` по умолчанию)
 - если есть `#profile-name`:
   - обновляется URL существующего профиля или создается новый профиль
   - текущим становится этот профиль
@@ -115,20 +127,3 @@ sing-box://import-remote-profile?url=https%3A%2F%2Fexample.com%2Fsub#profile-nam
 - Если в runtime-конфиге есть outbound типа `selector`, в UI показываются dropdown-поля выбора.
 - При запущенном ядре переключение выполняется live через `PUT /proxies/{selector}` (Clash API), без перезапуска процесса.
 - Выбранный outbound сохраняется в профиль (`selector_selections`) и автоматически применяется после следующего запуска ядра.
-
-## GitHub Actions
-
-Workflow: `.github/workflows/build-windows-on-tag.yml`
-
-- Триггер: push любого тега
-- Результат: artifact `singbox-gui-windows-<tag>`
-
-## Чистота репозитория
-
-Рекомендуется игнорировать локальные артефакты:
-
-- собранный exe
-- runtime-файлы (`config.yaml`, `config.json`, `sing-box.exe`)
-- временные логи
-
-Для этого добавлен `.gitignore`.

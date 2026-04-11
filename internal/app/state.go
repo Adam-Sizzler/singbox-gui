@@ -20,7 +20,6 @@ const (
 	configFileName        = "config.yaml"
 	singboxExeName        = "sing-box.exe"
 	legacyRuntimeCfgName  = "config.json"
-	userAgent             = "sfw"
 	createNoWindow        = 0x08000000
 	createNewProcessGroup = 0x00000200
 	ctrlBreakEvent        = 1
