@@ -7,7 +7,7 @@ English version: `README.md`
 
 ## Возможности
 
-- Итоговый бинарник: `singbox-gui.exe`
+- Итоговый бинарник: `singbox-wrapper.exe`
 - Фронтенд встроен в бинарник
 - Конфиг хранится рядом с `.exe` (`config.yaml`)
 - Загрузка `sing-box.exe` по выбранной версии (`latest` или semver)
@@ -53,7 +53,7 @@ go mod tidy
 Результат:
 
 ```text
-./singbox-gui.exe
+./singbox-wrapper.exe
 ```
 
 `build-windows.sh` также пересоздает `cmd/singbox-gui/rsrc.syso` из:
@@ -66,7 +66,7 @@ go mod tidy
 После первого запуска рядом с `exe` создаются:
 
 ```text
-singbox-gui.exe
+singbox-wrapper.exe
 config.yaml
 sing-box.exe
 config.json

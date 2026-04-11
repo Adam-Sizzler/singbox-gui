@@ -8,7 +8,7 @@ go run github.com/akavel/rsrc@v0.10.2 \
   -ico build/windows/app-icon.ico \
   -arch amd64 \
   -o cmd/singbox-gui/rsrc.syso
-rm -f singbox-gui.exe
+rm -f singbox-wrapper.exe singbox-gui.exe
 
 release_tag="${APP_RELEASE_TAG:-}"
 if [ -z "$release_tag" ]; then
@@ -45,6 +45,6 @@ fi
 
 CGO_CXXFLAGS="-I${shim_include} ${CGO_CXXFLAGS:-}" \
 CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC="$CC" CXX="$CXX" \
-  go build -a -ldflags "$ldflags" -o singbox-gui.exe ./cmd/singbox-gui
+  go build -a -ldflags "$ldflags" -o singbox-wrapper.exe ./cmd/singbox-gui
 
-echo "Built: $(pwd)/singbox-gui.exe"
+echo "Built: $(pwd)/singbox-wrapper.exe"
