@@ -37,8 +37,10 @@ const (
 	uiReadyFallbackTimeout = 5 * time.Second
 	gclpHICON              = int32(-14)
 	gclpHICONSM            = int32(-34)
-	mainWindowMinWidth     = 780
-	mainWindowMinHeight    = 460
+	mainWindowMinWidth     = 920
+	mainWindowMinHeight    = 600
+	mainWindowMaxWidth     = 1480
+	mainWindowMaxHeight    = 980
 	embeddedSyncDebounce   = 60 * time.Millisecond
 )
 
@@ -54,10 +56,18 @@ func (a *App) runUI() error {
 	a.debugf("ui: runUI started")
 
 	a.systemDark = detectSystemDarkTheme()
-	setPreferredAppTheme(a.systemDark)
 	startupCfg := a.getConfigSnapshot()
+	startupThemeMode := normalizeThemeMode(startupCfg.ThemeMode)
+	startupThemeDark := resolveThemeDark(startupThemeMode, a.systemDark)
+	setPreferredAppTheme(startupThemeDark)
 	startMinimizedToTray := startupCfg.StartMinimizedToTray && strings.TrimSpace(a.startupImport) == ""
-	a.debugf("ui: systemDark=%v startMinimizedToTray=%v", a.systemDark, startMinimizedToTray)
+	a.debugf(
+		"ui: systemDark=%v themeMode=%s themeDark=%v startMinimizedToTray=%v",
+		a.systemDark,
+		startupThemeMode,
+		startupThemeDark,
+		startMinimizedToTray,
+	)
 
 	uiHTML, err := loadEmbeddedUIHTML()
 	if err != nil {
@@ -131,12 +141,16 @@ func (a *App) runUI() error {
 		a.debugf("ui: SetTitle failed: %v", err)
 		return err
 	}
-	if err := a.web.SetSize(900, 560, webview.HintNone); err != nil {
+	if err := a.web.SetSize(mainWindowMinWidth, mainWindowMinHeight, webview.HintNone); err != nil {
 		a.debugf("ui: SetSize initial failed: %v", err)
 		return err
 	}
-	if err := a.web.SetSize(780, 460, webview.HintMin); err != nil {
+	if err := a.web.SetSize(mainWindowMinWidth, mainWindowMinHeight, webview.HintMin); err != nil {
 		a.debugf("ui: SetSize min failed: %v", err)
+		return err
+	}
+	if err := a.web.SetSize(mainWindowMaxWidth, mainWindowMaxHeight, webview.HintMax); err != nil {
+		a.debugf("ui: SetSize max failed: %v", err)
 		return err
 	}
 	a.syncEmbeddedWebViewWidgetBounds("after-size")
@@ -146,7 +160,7 @@ func (a *App) runUI() error {
 		a.log("WARN: не удалось инициализировать иконку трея: %v", err)
 		startMinimizedToTray = false
 	}
-	a.applyNativeDarkHints(a.systemDark)
+	a.applyNativeDarkHints(startupThemeDark)
 	a.hideMainWindow()
 
 	a.debugf("ui: loading embedded HTML into webview")
@@ -312,8 +326,14 @@ func (a *App) restoreMainWindowRect(tag string) {
 	if width < mainWindowMinWidth {
 		width = mainWindowMinWidth
 	}
+	if width > mainWindowMaxWidth {
+		width = mainWindowMaxWidth
+	}
 	if height < mainWindowMinHeight {
 		height = mainWindowMinHeight
+	}
+	if height > mainWindowMaxHeight {
+		height = mainWindowMaxHeight
 	}
 	if width <= 0 || height <= 0 {
 		a.debugf(
@@ -1037,6 +1057,10 @@ func setWindowCompositionDarkColors(hwnd win.HWND, dark bool) {
 	_, _, _ = procSetWindowCompAttr.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&data)))
 }
 
+func rgbToColorRef(r, g, b uint32) uint32 {
+	return (b << 16) | (g << 8) | r
+}
+
 func setImmersiveDarkMode(hwnd win.HWND, dark bool) {
 	var value int32
 	if dark {
@@ -1058,8 +1082,12 @@ func setImmersiveDarkMode(hwnd win.HWND, dark bool) {
 	text := uint32(dwmColorDefault)
 	border := uint32(dwmColorDefault)
 	if dark {
-		caption = 0x00202020
-		text = 0x00F3F3F3
+		caption = rgbToColorRef(0x31, 0x31, 0x31)
+		text = rgbToColorRef(0xF3, 0xF3, 0xF3)
+		border = dwmColorNone
+	} else {
+		caption = rgbToColorRef(0xD9, 0xDE, 0xE6)
+		text = rgbToColorRef(0x1E, 0x22, 0x2C)
 		border = dwmColorNone
 	}
 	_, _, _ = proc.Call(uintptr(hwnd), uintptr(dwmwaCaptionColor), uintptr(unsafe.Pointer(&caption)), unsafe.Sizeof(caption))
@@ -1127,7 +1155,7 @@ func (a *App) ensureTrayOwnerWindow() error {
 	}
 	if err := owner.SetMinMaxSize(
 		walk.Size{Width: mainWindowMinWidth, Height: mainWindowMinHeight},
-		walk.Size{},
+		walk.Size{Width: mainWindowMaxWidth, Height: mainWindowMaxHeight},
 	); err != nil {
 		owner.Dispose()
 		return err
@@ -1353,12 +1381,17 @@ func (a *App) startSystemThemeWatcher() {
 			case <-stop:
 				return
 			case <-ticker.C:
+				cfg := a.getConfigSnapshot()
+				if normalizeThemeMode(cfg.ThemeMode) != "auto" {
+					continue
+				}
+
 				dark := detectSystemDarkTheme()
 				if dark == a.systemDark {
 					continue
 				}
 				a.systemDark = dark
-				a.applyNativeDarkHints(dark)
+				a.applyNativeDarkHints(resolveThemeDark(cfg.ThemeMode, dark))
 				if dark {
 					a.log("Системная тема: Dark")
 				} else {
