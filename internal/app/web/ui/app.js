@@ -75,6 +75,7 @@
   var homeActionsTitleNode = document.getElementById("homeActionsTitle");
   var homeProfileTitleNode = document.getElementById("homeProfileTitle");
   var profilesActionsTitleNode = document.getElementById("profilesActionsTitle");
+  var labelProfileActionsNode = document.getElementById("labelProfileActions");
   var profilesEditorTitleNode = document.getElementById("profilesEditorTitle");
   var settingsAppTitleNode = document.getElementById("settingsAppTitle");
   var settingsLangTitleNode = document.getElementById("settingsLangTitle");
@@ -164,6 +165,7 @@
       homeActions: "Основные действия",
       homeProfileSection: "Профиль и селекторы",
       profileActions: "Действия профиля",
+      profileActionsLabel: "Управление:",
       profileListLabel: "Список профилей:",
       profilesEditor: "Параметры профиля",
       settingsApp: "Приложение",
@@ -179,7 +181,7 @@
       profile: "Профиль:",
       selector: "Селектор:",
       selectorEmpty: "Нет доступных селекторов",
-      runCheck: "Запуск/проверка:",
+      runCheck: "Запуск:",
       checkConfigLabel: "Проверка:",
       uptimeLabel: "Аптайм:",
       checkConfig: "Проверить",
@@ -222,6 +224,7 @@
       homeActions: "Primary actions",
       homeProfileSection: "Profile and selectors",
       profileActions: "Profile actions",
+      profileActionsLabel: "Manage:",
       profileListLabel: "Profiles list:",
       profilesEditor: "Profile settings",
       settingsApp: "Application",
@@ -237,7 +240,7 @@
       profile: "Profile:",
       selector: "Selector:",
       selectorEmpty: "No selectors available",
-      runCheck: "Run/Check:",
+      runCheck: "Run:",
       checkConfigLabel: "Check:",
       uptimeLabel: "Uptime:",
       checkConfig: "Check",
@@ -523,6 +526,7 @@
     if (homeActionsTitleNode) homeActionsTitleNode.textContent = tr("homeActions");
     if (homeProfileTitleNode) homeProfileTitleNode.textContent = tr("homeProfileSection");
     if (profilesActionsTitleNode) profilesActionsTitleNode.textContent = tr("profileActions");
+    if (labelProfileActionsNode) labelProfileActionsNode.textContent = tr("profileActionsLabel");
     if (profilesEditorTitleNode) profilesEditorTitleNode.textContent = tr("profilesEditor");
     if (settingsAppTitleNode) settingsAppTitleNode.textContent = tr("settingsApp");
     if (settingsLangTitleNode) settingsLangTitleNode.textContent = tr("settingsLanguage");

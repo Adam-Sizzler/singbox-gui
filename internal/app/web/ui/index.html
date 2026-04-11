@@ -11,13 +11,11 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <div class="sidebar-brand-line">
-          <div class="sidebar-brand-title">
-            <span id="sidebarBrandTitleFull">singbox-gui</span>
-            <span id="sidebarBrandTitleShort">sb-gui</span>
-          </div>
-          <span id="sidebarRunIndicator" class="sidebar-run-indicator" aria-hidden="true"></span>
+        <div class="sidebar-brand-title">
+          <span id="sidebarBrandTitleFull">singbox-gui</span>
+          <span id="sidebarBrandTitleShort">sb-gui</span>
         </div>
+        <span id="sidebarRunIndicator" class="sidebar-run-indicator" aria-hidden="true"></span>
       </div>
 
       <nav class="sidebar-nav" aria-label="Main Navigation">
@@ -141,9 +139,15 @@
             <div class="screen-grid profiles-grid">
               <article class="card profiles-list-card">
                 <h2 id="profilesActionsTitle">Действия профиля</h2>
-                <div class="profiles-toolbar">
-                  <button class="control" id="newProfile" type="button">Новый</button>
-                  <button class="control" id="deleteProfile" type="button">Удалить</button>
+
+                <div class="field-row">
+                  <label class="field-label" id="labelProfileActions">Управление:</label>
+                  <div class="field-control">
+                    <div class="profiles-toolbar">
+                      <button class="control" id="newProfile" type="button">Новый</button>
+                      <button class="control" id="deleteProfile" type="button">Удалить</button>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="field-row profiles-selector-row">
