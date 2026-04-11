@@ -9,12 +9,17 @@
   var profilePicker = document.getElementById("profilePicker");
   var profileValueNode = document.getElementById("profileValue");
   var profileMenu = document.getElementById("profileMenu");
+  var profileWrapProfiles = document.getElementById("profileWrapProfiles");
+  var profilePickerProfiles = document.getElementById("profilePickerProfiles");
+  var profileValueProfilesNode = document.getElementById("profileValueProfiles");
+  var profileMenuProfiles = document.getElementById("profileMenuProfiles");
   var newProfileBtn = document.getElementById("newProfile");
   var deleteProfileBtn = document.getElementById("deleteProfile");
   var selectorBlockNode = document.getElementById("selectorBlock");
   var selectorGroupsNode = document.getElementById("selectorGroups");
   var checkConfigBtn = document.getElementById("checkConfig");
   var startStopBtn = document.getElementById("startStop");
+  var clearLogsBtn = document.getElementById("clearLogs");
   var copyLogsBtn = document.getElementById("copyLogs");
   var mobileActionsWrap = document.getElementById("mobileActionsWrap");
   var mobileActionsToggleBtn = document.getElementById("mobileActionsToggle");
@@ -55,6 +60,32 @@
   var confirmMessageNode = document.getElementById("confirmMessage");
   var confirmCancelBtn = document.getElementById("confirmCancel");
   var confirmOkBtn = document.getElementById("confirmOk");
+  var navHomeBtn = document.getElementById("navHomeBtn");
+  var navProfilesBtn = document.getElementById("navProfilesBtn");
+  var navLogsBtn = document.getElementById("navLogsBtn");
+  var navSettingsBtn = document.getElementById("navSettingsBtn");
+  var navHomeLabelNode = document.getElementById("navHomeLabel");
+  var navProfilesLabelNode = document.getElementById("navProfilesLabel");
+  var navLogsLabelNode = document.getElementById("navLogsLabel");
+  var navSettingsLabelNode = document.getElementById("navSettingsLabel");
+  var homeTitleNode = document.getElementById("homeTitle");
+  var profilesTitleNode = document.getElementById("profilesTitle");
+  var homeActionsTitleNode = document.getElementById("homeActionsTitle");
+  var homeProfileTitleNode = document.getElementById("homeProfileTitle");
+  var profilesActionsTitleNode = document.getElementById("profilesActionsTitle");
+  var profilesEditorTitleNode = document.getElementById("profilesEditorTitle");
+  var settingsAppTitleNode = document.getElementById("settingsAppTitle");
+  var settingsLangTitleNode = document.getElementById("settingsLangTitle");
+  var settingsRuntimeTitleNode = document.getElementById("settingsRuntimeTitle");
+  var labelProfileNameNode = document.getElementById("labelProfileName");
+  var labelProfilesSelectorNode = document.getElementById("labelProfilesSelector");
+  var appVersionLabelNode = document.getElementById("appVersionLabel");
+  var appVersionValueNode = document.getElementById("appVersionValue");
+  var sidebarRunIndicatorNode = document.getElementById("sidebarRunIndicator");
+  var screenHomeNode = document.getElementById("screenHome");
+  var screenProfilesNode = document.getElementById("screenProfiles");
+  var screenLogsNode = document.getElementById("screenLogs");
+  var screenSettingsNode = document.getElementById("screenSettings");
 
   var lastLogId = 0;
   var stateTimer = null;
@@ -80,8 +111,10 @@
   var profileNames = [];
   var selectedProfile = "";
   var profileMenuOpened = false;
+  var openedProfileMenuKind = "";
   var releaseMenuOpened = false;
   var mobileActionsOpened = false;
+  var activeScreen = "home";
   var currentLanguage = "ru";
   var lastRunning = false;
   var lastBusy = false;
@@ -122,8 +155,20 @@
 
   var I18N = {
     ru: {
+      home: "Главная",
+      profiles: "Профили",
       settings: "Настройки",
       logs: "Логи",
+      homeActions: "Основные действия",
+      homeProfileSection: "Профиль и селекторы",
+      profileActions: "Действия профиля",
+      profileListLabel: "Список профилей:",
+      profilesEditor: "Параметры профиля",
+      settingsApp: "Приложение",
+      settingsLanguage: "Язык",
+      settingsRuntime: "Запуск и обновления",
+      profileName: "Имя профиля:",
+      appVersion: "Версия:",
       configUrl: "Ссылка:",
       version: "Версия ядра:",
       autoUpdate: "Автообновление (часы):",
@@ -138,6 +183,7 @@
       deleteProfile: "Удалить",
       start: "Старт",
       stop: "Стоп",
+      clearLogs: "Очистить",
       copyLogs: "Копировать логи",
       logsFilterPlaceholder: "Фильтр RegExp",
       logsFilterInvalid: "Некорректный RegExp",
@@ -145,8 +191,12 @@
       actionsMenu: "Действия",
       statusBusy: "Выполняется операция...",
       statusConfigOk: "Конфигурация валидна",
+      statusRunning: "Ядро запущено",
+      statusStopped: "Ядро остановлено",
       uptime: "Аптайм",
+      statusLogsCleared: "Логи очищены",
       statusLogsCopied: "Логи скопированы в буфер обмена",
+      profilesEmpty: "Профили отсутствуют",
       releaseButton: "Релиз",
       releaseCurrent: "Текущий релиз",
       releaseLatest: "Новый релиз",
@@ -161,8 +211,20 @@
       errorPrefix: "ERROR: "
     },
     en: {
+      home: "Home",
+      profiles: "Profiles",
       settings: "Settings",
       logs: "Logs",
+      homeActions: "Primary actions",
+      homeProfileSection: "Profile and selectors",
+      profileActions: "Profile actions",
+      profileListLabel: "Profiles list:",
+      profilesEditor: "Profile settings",
+      settingsApp: "Application",
+      settingsLanguage: "Language",
+      settingsRuntime: "Startup and updates",
+      profileName: "Profile name:",
+      appVersion: "Version:",
       configUrl: "Config URL:",
       version: "Core version:",
       autoUpdate: "Auto-update (hours):",
@@ -177,6 +239,7 @@
       deleteProfile: "Delete",
       start: "Start",
       stop: "Stop",
+      clearLogs: "Clear logs",
       copyLogs: "Copy Logs",
       logsFilterPlaceholder: "RegExp filter",
       logsFilterInvalid: "Invalid RegExp",
@@ -184,8 +247,12 @@
       actionsMenu: "Actions",
       statusBusy: "Operation in progress...",
       statusConfigOk: "Configuration is valid",
+      statusRunning: "Core is running",
+      statusStopped: "Core is stopped",
       uptime: "Uptime",
+      statusLogsCleared: "Logs cleared",
       statusLogsCopied: "Logs copied to clipboard",
+      profilesEmpty: "No profiles",
       releaseButton: "Release",
       releaseCurrent: "Current release",
       releaseLatest: "New release",
@@ -288,6 +355,7 @@
   function renderStartStopIndicator() {
     if (!startStopBtn) return;
     startStopBtn.className = lastRunning ? "control core-running" : "control";
+    renderSidebarStatus();
   }
 
   function normalizeLanguage(raw) {
@@ -350,10 +418,112 @@
     return key;
   }
 
+  function normalizeScreenName(raw) {
+    var value = String(raw || "").toLowerCase();
+    if (value === "profiles" || value === "logs" || value === "settings" || value === "home") {
+      return value;
+    }
+    return "home";
+  }
+
+  function applyActiveScreenUI() {
+    var screens = [
+      { name: "home", node: screenHomeNode, nav: navHomeBtn },
+      { name: "profiles", node: screenProfilesNode, nav: navProfilesBtn },
+      { name: "logs", node: screenLogsNode, nav: navLogsBtn },
+      { name: "settings", node: screenSettingsNode, nav: navSettingsBtn }
+    ];
+
+    for (var i = 0; i < screens.length; i++) {
+      var item = screens[i];
+      var isActive = item.name === activeScreen;
+      if (item.node) {
+        item.node.hidden = !isActive;
+        item.node.className = isActive ? "screen active" : "screen";
+      }
+      if (item.nav) {
+        item.nav.className = isActive ? "sidebar-nav-btn active" : "sidebar-nav-btn";
+        if (isActive) {
+          item.nav.setAttribute("aria-current", "page");
+        } else {
+          item.nav.removeAttribute("aria-current");
+        }
+      }
+    }
+  }
+
+  function setActiveScreen(nextScreen) {
+    var normalized = normalizeScreenName(nextScreen);
+    if (activeScreen === normalized) {
+      applyActiveScreenUI();
+      return;
+    }
+    activeScreen = normalized;
+    applyActiveScreenUI();
+    if (activeScreen !== "home") {
+      closeProfileMenu();
+      closeSelectorMenu();
+    }
+    if (activeScreen !== "settings") {
+      closeReleaseMenu();
+    }
+  }
+
+  function selectProfileByName(name) {
+    var value = String(name || "").trim();
+    if (!value || value === selectedProfile) return;
+    api("POST", "/api/state", { current_profile: value }, function (err, state) {
+      if (err) {
+        setStatus(tr("errorPrefix") + err.message);
+        return;
+      }
+      renderState(state);
+    });
+  }
+
+  function renderAppVersion(value) {
+    if (!appVersionValueNode) return;
+    var shown = String(value || "").trim();
+    if (!shown) shown = tr("releaseUnknown");
+    appVersionValueNode.textContent = shown;
+    appVersionValueNode.title = shown;
+  }
+
+  function renderSidebarStatus() {
+    if (!sidebarRunIndicatorNode) return;
+    var cls = "sidebar-run-indicator";
+    var title = tr("statusStopped");
+    if (lastBusy) {
+      cls += " busy";
+      title = tr("statusBusy");
+    } else if (lastRunning) {
+      cls += " running";
+      title = tr("statusRunning");
+    }
+    sidebarRunIndicatorNode.className = cls;
+    sidebarRunIndicatorNode.title = title;
+  }
+
   function applyLanguageUI() {
     document.documentElement.lang = currentLanguage;
+    if (navHomeLabelNode) navHomeLabelNode.textContent = tr("home");
+    if (navProfilesLabelNode) navProfilesLabelNode.textContent = tr("profiles");
+    if (navLogsLabelNode) navLogsLabelNode.textContent = tr("logs");
+    if (navSettingsLabelNode) navSettingsLabelNode.textContent = tr("settings");
+    if (homeTitleNode) homeTitleNode.textContent = tr("home");
+    if (profilesTitleNode) profilesTitleNode.textContent = tr("profiles");
     if (settingsTitleNode) settingsTitleNode.textContent = tr("settings");
     if (logsTitleNode) logsTitleNode.textContent = tr("logs");
+    if (homeActionsTitleNode) homeActionsTitleNode.textContent = tr("homeActions");
+    if (homeProfileTitleNode) homeProfileTitleNode.textContent = tr("homeProfileSection");
+    if (profilesActionsTitleNode) profilesActionsTitleNode.textContent = tr("profileActions");
+    if (profilesEditorTitleNode) profilesEditorTitleNode.textContent = tr("profilesEditor");
+    if (settingsAppTitleNode) settingsAppTitleNode.textContent = tr("settingsApp");
+    if (settingsLangTitleNode) settingsLangTitleNode.textContent = tr("settingsLanguage");
+    if (settingsRuntimeTitleNode) settingsRuntimeTitleNode.textContent = tr("settingsRuntime");
+    if (labelProfileNameNode) labelProfileNameNode.textContent = tr("profileName");
+    if (labelProfilesSelectorNode) labelProfilesSelectorNode.textContent = tr("profileListLabel");
+    if (appVersionLabelNode) appVersionLabelNode.textContent = tr("appVersion");
     if (labelUrlNode) labelUrlNode.textContent = tr("configUrl");
     if (labelVersionNode) labelVersionNode.textContent = tr("version");
     if (labelAutoUpdateNode) labelAutoUpdateNode.textContent = tr("autoUpdate");
@@ -365,6 +535,7 @@
     if (checkConfigBtn) checkConfigBtn.textContent = tr("checkConfig");
     if (newProfileBtn) newProfileBtn.textContent = tr("newProfile");
     if (deleteProfileBtn) deleteProfileBtn.textContent = tr("deleteProfile");
+    if (clearLogsBtn) clearLogsBtn.textContent = tr("clearLogs");
     if (copyLogsBtn) copyLogsBtn.textContent = tr("copyLogs");
     if (logsFilterInput) {
       var filterHint = tr("logsFilterPlaceholder");
@@ -382,8 +553,15 @@
     if (confirmTitleNode) confirmTitleNode.textContent = tr("confirmTitle");
     if (confirmCancelBtn) confirmCancelBtn.textContent = tr("cancel");
     if (confirmOkBtn) confirmOkBtn.textContent = tr("deleteAction");
+    if (navHomeBtn) navHomeBtn.title = tr("home");
+    if (navProfilesBtn) navProfilesBtn.title = tr("profiles");
+    if (navLogsBtn) navLogsBtn.title = tr("logs");
+    if (navSettingsBtn) navSettingsBtn.title = tr("settings");
     renderUptime(lastUptimeSeconds, lastRunning);
+    renderAppVersion(lastAppReleaseTag);
+    renderSidebarStatus();
     renderAppReleaseMenu(lastAppReleaseTag, lastAppReleaseURL, lastAppUpdateAvailable, lastAppLatestReleaseTag, lastAppLatestReleaseURL);
+    renderProfileMenu();
 
     if (langRuBtn) {
       langRuBtn.className = currentLanguage === "ru" ? "control lang-btn active" : "control lang-btn";
@@ -582,8 +760,14 @@
     if (profileValueNode) {
       profileValueNode.textContent = selectedProfile || "-";
     }
+    if (profileValueProfilesNode) {
+      profileValueProfilesNode.textContent = selectedProfile || "-";
+    }
     if (profilePicker) {
       profilePicker.title = selectedProfile || "";
+    }
+    if (profilePickerProfiles) {
+      profilePickerProfiles.title = selectedProfile || "";
     }
     if (profileNameInput) {
       if (document.activeElement !== profileNameInput || (!profileRenameInFlight && !profileRenameTimer)) {
@@ -593,10 +777,9 @@
     }
   }
 
-  function renderProfileMenu() {
-    if (!profileMenu) return;
-    profileMenu.innerHTML = "";
-
+  function renderProfileMenuNode(menuNode) {
+    if (!menuNode) return;
+    menuNode.innerHTML = "";
     for (var i = 0; i < profileNames.length; i++) {
       var name = profileNames[i];
       var item = document.createElement("button");
@@ -609,44 +792,70 @@
         return function () {
           closeProfileMenu();
           if (loadingState) return;
-          if (!value || value === selectedProfile) return;
-          api("POST", "/api/state", { current_profile: value }, function (err, state) {
-            if (err) {
-              setStatus(tr("errorPrefix") + err.message);
-              return;
-            }
-            renderState(state);
-          });
+          selectProfileByName(value);
         };
       })(name);
-      profileMenu.appendChild(item);
+      menuNode.appendChild(item);
     }
   }
 
-  function openProfileMenu() {
-    if (!profileMenu || !profilePicker) return;
+  function renderProfileMenu() {
+    renderProfileMenuNode(profileMenu);
+    renderProfileMenuNode(profileMenuProfiles);
+  }
+
+  function getProfileMenuNodes(kind) {
+    if (kind === "profiles") {
+      return {
+        menu: profileMenuProfiles,
+        picker: profilePickerProfiles
+      };
+    }
+    return {
+      menu: profileMenu,
+      picker: profilePicker
+    };
+  }
+
+  function openProfileMenu(kind) {
+    var nodes = getProfileMenuNodes(kind);
+    if (!nodes.menu || !nodes.picker) return;
+    closeProfileMenu();
     renderProfileMenu();
-    profileMenu.hidden = false;
-    profileMenu.scrollTop = 0;
-    profilePicker.className = "control profile-picker open";
-    profilePicker.setAttribute("aria-expanded", "true");
+    nodes.menu.hidden = false;
+    nodes.menu.scrollTop = 0;
+    nodes.picker.className = "control profile-picker open";
+    nodes.picker.setAttribute("aria-expanded", "true");
     profileMenuOpened = true;
+    openedProfileMenuKind = kind === "profiles" ? "profiles" : "home";
   }
 
   function closeProfileMenu() {
-    if (!profileMenu || !profilePicker) return;
-    profileMenu.hidden = true;
-    profilePicker.className = "control profile-picker";
-    profilePicker.setAttribute("aria-expanded", "false");
+    if (profileMenu) {
+      profileMenu.hidden = true;
+    }
+    if (profilePicker) {
+      profilePicker.className = "control profile-picker";
+      profilePicker.setAttribute("aria-expanded", "false");
+    }
+    if (profileMenuProfiles) {
+      profileMenuProfiles.hidden = true;
+    }
+    if (profilePickerProfiles) {
+      profilePickerProfiles.className = "control profile-picker";
+      profilePickerProfiles.setAttribute("aria-expanded", "false");
+    }
     profileMenuOpened = false;
+    openedProfileMenuKind = "";
   }
 
-  function toggleProfileMenu() {
-    if (profileMenuOpened) {
+  function toggleProfileMenu(kind) {
+    var normalized = kind === "profiles" ? "profiles" : "home";
+    if (profileMenuOpened && openedProfileMenuKind === normalized) {
       closeProfileMenu();
       return;
     }
-    openProfileMenu();
+    openProfileMenu(normalized);
   }
 
   function isConfirmModalOpen() {
@@ -1066,11 +1275,6 @@
       picker.setAttribute("aria-haspopup", "listbox");
       picker.setAttribute("aria-expanded", "false");
       picker.title = group.current;
-      picker.onmouseenter = function () {
-        var pickerSelector = String(this.getAttribute("data-selector") || "").trim();
-        if (!pickerSelector || this.disabled) return;
-        openSelectorMenu(pickerSelector);
-      };
 
       var arrowNode = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       arrowNode.setAttribute("class", "profile-arrow");
@@ -1261,6 +1465,16 @@
     });
   }
 
+  function runClearLogsAction() {
+    logBuffer = [];
+    if (logsNode) {
+      logsNode.innerHTML = "";
+      logsNode.scrollTop = 0;
+    }
+    setStatus(tr("statusLogsCleared"));
+    showToast("success", tr("statusLogsCleared"));
+  }
+
   function runUpdateAppAction() {
     if (appUpdateInFlight || lastBusy || !lastAppUpdateAvailable || !lastAppLatestReleaseTag) return;
     appUpdateInFlight = true;
@@ -1360,11 +1574,14 @@
     lastAppUpdateAvailable = !!state.app_update_available;
     lastAppLatestReleaseTag = String(state.app_latest_release_tag || "").trim();
     lastAppLatestReleaseURL = String(state.app_latest_release_url || "").trim();
+    renderAppVersion(lastAppReleaseTag);
     renderSelectorGroups(nextSelectorGroups);
     if (startStopBtn) {
       startStopBtn.disabled = lastBusy;
     }
     setCheckButtonsDisabled(lastBusy);
+    renderProfileMenu();
+    renderSidebarStatus();
 
     var languageChanged = prevLanguage !== currentLanguage;
     var needsInitialLanguageApply = !initialStateRendered;
@@ -1945,32 +2162,59 @@
     });
   }
 
-  profilePicker.onclick = function () {
-    toggleProfileMenu();
-  };
-
-  profilePicker.onmouseenter = function () {
-    openProfileMenu();
-  };
-
-  if (profileWrap) {
-    profileWrap.onmouseleave = function () {
-      closeProfileMenu();
+  function bindNavButton(btn, screen) {
+    if (!btn) return;
+    btn.onclick = function () {
+      setActiveScreen(screen);
+      if (screen === "logs" && logsNode) {
+        logsNode.scrollTop = logsNode.scrollHeight;
+      }
     };
   }
 
-  profilePicker.onkeydown = function (e) {
-    var key = e.key || "";
-    if (key === "Enter" || key === " " || key === "ArrowDown") {
-      if (e.preventDefault) e.preventDefault();
-      openProfileMenu();
-      return;
-    }
-    if (key === "Escape") {
-      if (e.preventDefault) e.preventDefault();
-      closeProfileMenu();
-    }
-  };
+  bindNavButton(navHomeBtn, "home");
+  bindNavButton(navProfilesBtn, "profiles");
+  bindNavButton(navLogsBtn, "logs");
+  bindNavButton(navSettingsBtn, "settings");
+  applyActiveScreenUI();
+
+  if (profilePicker) {
+    profilePicker.onclick = function () {
+      toggleProfileMenu("home");
+    };
+
+    profilePicker.onkeydown = function (e) {
+      var key = e.key || "";
+      if (key === "Enter" || key === " " || key === "ArrowDown") {
+        if (e.preventDefault) e.preventDefault();
+        openProfileMenu("home");
+        return;
+      }
+      if (key === "Escape") {
+        if (e.preventDefault) e.preventDefault();
+        closeProfileMenu();
+      }
+    };
+  }
+
+  if (profilePickerProfiles) {
+    profilePickerProfiles.onclick = function () {
+      toggleProfileMenu("profiles");
+    };
+
+    profilePickerProfiles.onkeydown = function (e) {
+      var key = e.key || "";
+      if (key === "Enter" || key === " " || key === "ArrowDown") {
+        if (e.preventDefault) e.preventDefault();
+        openProfileMenu("profiles");
+        return;
+      }
+      if (key === "Escape") {
+        if (e.preventDefault) e.preventDefault();
+        closeProfileMenu();
+      }
+    };
+  }
 
   if (releaseMenuToggleBtn && releaseMenuToggleBtn.tagName === "BUTTON") {
     releaseMenuToggleBtn.onclick = function () {
@@ -1991,9 +2235,6 @@
   }
 
   if (releaseMenuToggleArrowBtn) {
-    releaseMenuToggleArrowBtn.onmouseenter = function () {
-      openReleaseMenu();
-    };
     releaseMenuToggleArrowBtn.onclick = function () {
       toggleReleaseMenu();
     };
@@ -2025,8 +2266,12 @@
 
   document.addEventListener("mousedown", function (e) {
     var target = e.target || e.srcElement;
-    if (profileMenuOpened && profileWrap && profileWrap.contains && !profileWrap.contains(target)) {
-      closeProfileMenu();
+    if (profileMenuOpened) {
+      var insideHomeProfile = !!(profileWrap && profileWrap.contains && profileWrap.contains(target));
+      var insideProfilesProfile = !!(profileWrapProfiles && profileWrapProfiles.contains && profileWrapProfiles.contains(target));
+      if (!insideHomeProfile && !insideProfilesProfile) {
+        closeProfileMenu();
+      }
     }
     if (releaseMenuOpened && releaseMenuWrap && releaseMenuWrap.contains && !releaseMenuWrap.contains(target)) {
       closeReleaseMenu();
@@ -2240,9 +2485,17 @@
     };
   }
 
-  copyLogsBtn.onclick = function () {
-    runCopyLogsAction();
-  };
+  if (clearLogsBtn) {
+    clearLogsBtn.onclick = function () {
+      runClearLogsAction();
+    };
+  }
+
+  if (copyLogsBtn) {
+    copyLogsBtn.onclick = function () {
+      runCopyLogsAction();
+    };
+  }
 
   function syncStateAndLogs(force) {
     if (force) {

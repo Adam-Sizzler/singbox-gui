@@ -37,8 +37,12 @@ const (
 	uiReadyFallbackTimeout = 5 * time.Second
 	gclpHICON              = int32(-14)
 	gclpHICONSM            = int32(-34)
-	mainWindowMinWidth     = 780
-	mainWindowMinHeight    = 460
+	mainWindowInitWidth    = 1080
+	mainWindowInitHeight   = 700
+	mainWindowMinWidth     = 920
+	mainWindowMinHeight    = 600
+	mainWindowMaxWidth     = 1480
+	mainWindowMaxHeight    = 980
 	embeddedSyncDebounce   = 60 * time.Millisecond
 )
 
@@ -131,12 +135,16 @@ func (a *App) runUI() error {
 		a.debugf("ui: SetTitle failed: %v", err)
 		return err
 	}
-	if err := a.web.SetSize(900, 560, webview.HintNone); err != nil {
+	if err := a.web.SetSize(mainWindowInitWidth, mainWindowInitHeight, webview.HintNone); err != nil {
 		a.debugf("ui: SetSize initial failed: %v", err)
 		return err
 	}
-	if err := a.web.SetSize(780, 460, webview.HintMin); err != nil {
+	if err := a.web.SetSize(mainWindowMinWidth, mainWindowMinHeight, webview.HintMin); err != nil {
 		a.debugf("ui: SetSize min failed: %v", err)
+		return err
+	}
+	if err := a.web.SetSize(mainWindowMaxWidth, mainWindowMaxHeight, webview.HintMax); err != nil {
+		a.debugf("ui: SetSize max failed: %v", err)
 		return err
 	}
 	a.syncEmbeddedWebViewWidgetBounds("after-size")
@@ -312,8 +320,14 @@ func (a *App) restoreMainWindowRect(tag string) {
 	if width < mainWindowMinWidth {
 		width = mainWindowMinWidth
 	}
+	if width > mainWindowMaxWidth {
+		width = mainWindowMaxWidth
+	}
 	if height < mainWindowMinHeight {
 		height = mainWindowMinHeight
+	}
+	if height > mainWindowMaxHeight {
+		height = mainWindowMaxHeight
 	}
 	if width <= 0 || height <= 0 {
 		a.debugf(
@@ -1127,7 +1141,7 @@ func (a *App) ensureTrayOwnerWindow() error {
 	}
 	if err := owner.SetMinMaxSize(
 		walk.Size{Width: mainWindowMinWidth, Height: mainWindowMinHeight},
-		walk.Size{},
+		walk.Size{Width: mainWindowMaxWidth, Height: mainWindowMaxHeight},
 	); err != nil {
 		owner.Dispose()
 		return err
