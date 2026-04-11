@@ -572,23 +572,9 @@ button.control:disabled {
   min-width: 108px;
 }
 
-.run-controls {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-
 #startStop {
   position: relative;
   padding-left: 12px;
-}
-
-.run-controls #startStop,
-.run-controls #checkConfig,
-.run-controls .uptime {
-  width: 180px;
-  max-width: 100%;
 }
 
 #releaseMenuToggle {
@@ -677,10 +663,8 @@ button.control:disabled {
 .selector-current-input,
 .selector-current-input-empty {
   cursor: default;
-}
-
-.selector-current-input,
-.selector-current-input-empty {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
   background: var(--ui-accent) !important;
   color: var(--ui-accent-text) !important;
   font-weight: 700;

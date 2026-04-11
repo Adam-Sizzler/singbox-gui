@@ -52,6 +52,8 @@
   var labelProfileNode = document.getElementById("labelProfile");
   var labelSelectorNode = document.getElementById("labelSelector");
   var labelRunCheckNode = document.getElementById("labelRunCheck");
+  var labelUptimeNode = document.getElementById("labelUptime");
+  var labelCheckConfigNode = document.getElementById("labelCheckConfig");
   var langRuBtn = document.getElementById("langRu");
   var langEnBtn = document.getElementById("langEn");
   var confirmModal = document.getElementById("confirmModal");
@@ -178,6 +180,8 @@
       selector: "Селектор:",
       selectorEmpty: "Нет доступных селекторов",
       runCheck: "Запуск/проверка:",
+      checkConfigLabel: "Проверка:",
+      uptimeLabel: "Аптайм:",
       checkConfig: "Проверить",
       newProfile: "Новый",
       deleteProfile: "Удалить",
@@ -234,6 +238,8 @@
       selector: "Selector:",
       selectorEmpty: "No selectors available",
       runCheck: "Run/Check:",
+      checkConfigLabel: "Check:",
+      uptimeLabel: "Uptime:",
       checkConfig: "Check",
       newProfile: "New",
       deleteProfile: "Delete",
@@ -532,6 +538,8 @@
     if (labelProfileNode) labelProfileNode.textContent = tr("profile");
     if (labelSelectorNode) labelSelectorNode.textContent = tr("selector");
     if (labelRunCheckNode) labelRunCheckNode.textContent = tr("runCheck");
+    if (labelUptimeNode) labelUptimeNode.textContent = tr("uptimeLabel");
+    if (labelCheckConfigNode) labelCheckConfigNode.textContent = tr("checkConfigLabel");
     if (checkConfigBtn) checkConfigBtn.textContent = tr("checkConfig");
     if (newProfileBtn) newProfileBtn.textContent = tr("newProfile");
     if (deleteProfileBtn) deleteProfileBtn.textContent = tr("deleteProfile");
@@ -711,7 +719,7 @@
   function renderUptime(uptimeSeconds, running) {
     if (!uptimeNode) return;
     var shown = running ? formatUptime(uptimeSeconds) : "00:00:00";
-    uptimeNode.textContent = tr("uptime") + ": " + shown;
+    uptimeNode.textContent = shown;
   }
 
   function setLanguage(next, persist) {

@@ -76,14 +76,25 @@
             <div class="screen-grid home-grid">
               <article class="card">
                 <h2 id="homeActionsTitle">Основные действия</h2>
+
                 <div class="field-row">
-                  <label class="field-label" id="labelRunCheck" for="startStop">Запуск/проверка:</label>
+                  <label class="field-label" id="labelUptime">Аптайм:</label>
                   <div class="field-control">
-                    <div class="run-controls">
-                      <button class="control" id="startStop" type="button">Старт</button>
-                      <button class="control" id="checkConfig" type="button">Проверить</button>
-                      <div id="uptime" class="uptime"></div>
-                    </div>
+                    <div id="uptime" class="uptime"></div>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <label class="field-label" id="labelRunCheck" for="startStop">Запуск:</label>
+                  <div class="field-control">
+                    <button class="control" id="startStop" type="button">Старт</button>
+                  </div>
+                </div>
+
+                <div class="field-row">
+                  <label class="field-label" id="labelCheckConfig" for="checkConfig">Проверка:</label>
+                  <div class="field-control">
+                    <button class="control" id="checkConfig" type="button">Проверить</button>
                   </div>
                 </div>
                 <div id="status" class="status"></div>
