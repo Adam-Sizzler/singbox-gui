@@ -19,7 +19,7 @@ import (
 
 const (
 	appReleaseLatestAPIURL       = "https://api.github.com/repos/Adam-Sizzler/singbox-wrapper/releases/latest"
-	appReleaseBinaryAssetName    = "singbox-gui.exe"
+	appReleaseBinaryAssetName    = "singbox-wrapper.exe"
 	appReleaseCheckInterval      = 12 * time.Hour
 	appReleaseCheckErrorInterval = 10 * time.Minute
 )

@@ -7,7 +7,7 @@ Repository: `https://github.com/Adam-Sizzler/singbox-wrapper`
 
 ## Features
 
-- Single executable target: `singbox-gui.exe`
+- Single executable target: `singbox-wrapper.exe`
 - Embedded UI assets (frontend is built into the binary)
 - Config stored near executable (`config.yaml`)
 - Downloads `sing-box.exe` by selected version (`latest` or semver)
@@ -53,7 +53,7 @@ go mod tidy
 Output:
 
 ```text
-./singbox-gui.exe
+./singbox-wrapper.exe
 ```
 
 `build-windows.sh` also regenerates `cmd/singbox-gui/rsrc.syso` from:
@@ -66,7 +66,7 @@ Output:
 After first start, files are created next to executable:
 
 ```text
-singbox-gui.exe
+singbox-wrapper.exe
 config.yaml
 sing-box.exe
 config.json
