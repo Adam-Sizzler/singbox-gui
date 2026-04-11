@@ -2,7 +2,7 @@
   --ui-bg: #313131;
   --ui-surface: #1f1f1f;
   --ui-surface-2: #232323;
-  --ui-panel: #383838;
+  --ui-panel: #1f1f1f;
   --ui-border: #3a3a3a;
   --ui-muted: #a8a8a8;
   --ui-text: #f3f3f3;
@@ -20,6 +20,7 @@
   --ui-sidebar-nav-height: 42px;
   --ui-sidebar-nav-radius: 999px;
   --ui-panel-outline: #1f1f1f;
+  --ui-panel-padding: 14px;
   --ui-sidebar-control-bg: #1f1f1f;
   --ui-sidebar-control-hover: #272727;
   --ui-sidebar-control-active: #171717;
@@ -43,7 +44,7 @@ body.theme-light {
   --ui-bg: #e4e8ee;
   --ui-surface: #ffffff;
   --ui-surface-2: #f7f7f8;
-  --ui-panel: #edf1f5;
+  --ui-panel: #ffffff;
   --ui-border: #d6d8dd;
   --ui-muted: #5f6470;
   --ui-text: #1e222c;
@@ -53,8 +54,8 @@ body.theme-light {
   --ui-accent-active: #d9b63f;
   --ui-panel-outline: #ffffff;
   --ui-sidebar-control-bg: #ffffff;
-  --ui-sidebar-control-hover: #ffffff;
-  --ui-sidebar-control-active: #ffffff;
+  --ui-sidebar-control-hover: #f1f4f8;
+  --ui-sidebar-control-active: #e8edf3;
 }
 
 * {
@@ -315,7 +316,7 @@ body.ui-loading .app-shell {
   border-radius: 12px;
   border: 1px solid var(--ui-panel-outline);
   background: var(--ui-panel);
-  padding: 10px;
+  padding: var(--ui-panel-padding);
   overflow: hidden;
 }
 
@@ -1513,7 +1514,7 @@ body::-webkit-scrollbar-thumb:hover,
   }
 
   .panel {
-    padding: 10px;
+    padding: var(--ui-panel-padding);
   }
 
   .card {
