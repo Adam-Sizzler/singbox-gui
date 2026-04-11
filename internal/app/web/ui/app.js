@@ -1028,7 +1028,7 @@
     }
   }
 
-  function showToast(kind, message, ttlMs) {
+  function showToast(kind, message) {
     if (!toastStack || !message) return;
 
     var tone = kind || "info";
@@ -1471,6 +1471,7 @@
     }, function (err, state) {
       selectorSwitchInFlight = false;
       if (err) {
+        pollLogs(true);
         if (selectNode && selectNode.focus) {
           try { selectNode.focus(); } catch (e) {}
         }
@@ -1481,6 +1482,7 @@
       }
       renderState(state);
       applySelectorControlsDisabledState();
+      pollLogs(true);
     });
   }
 
@@ -1620,7 +1622,7 @@
         updateAppBtn.disabled = true;
       }
       setStatus(tr("statusUpdateStarted"));
-      showToast("success", tr("statusUpdateStarted"), 3000);
+      showToast("success", tr("statusUpdateStarted"));
     });
   }
 

@@ -28,6 +28,8 @@ const (
 	clashApplyRetryMaxTries = 8
 )
 
+var clashAPIHTTPClient = &http.Client{Timeout: clashAPIRequestTimeout}
+
 type SelectorGroupState struct {
 	Name      string   `json:"name"`
 	Current   string   `json:"current"`
@@ -343,14 +345,14 @@ func cloneSelectorGroups(groups []SelectorGroupState) []SelectorGroupState {
 	if len(groups) == 0 {
 		return nil
 	}
-	cloned := make([]SelectorGroupState, 0, len(groups))
-	for _, group := range groups {
-		cloned = append(cloned, SelectorGroupState{
+	cloned := make([]SelectorGroupState, len(groups))
+	for i, group := range groups {
+		cloned[i] = SelectorGroupState{
 			Name:      group.Name,
 			Current:   group.Current,
 			Options:   append([]string(nil), group.Options...),
 			CanSwitch: group.CanSwitch,
-		})
+		}
 	}
 	return cloned
 }
@@ -367,10 +369,7 @@ func (a *App) setClashSession(controller, secret, runtimeCfgPath string) {
 	a.clashController = strings.TrimSpace(controller)
 	a.clashSecret = strings.TrimSpace(secret)
 	a.clashRuntimeCfg = strings.TrimSpace(runtimeCfgPath)
-	a.selectorCacheProfile = ""
-	a.selectorCacheLive = false
-	a.selectorCacheExpiresAt = time.Time{}
-	a.selectorCacheGroups = nil
+	a.clearSelectorCacheLocked()
 }
 
 func (a *App) resetClashSession() {
@@ -379,15 +378,16 @@ func (a *App) resetClashSession() {
 	a.clashController = ""
 	a.clashSecret = ""
 	a.clashRuntimeCfg = ""
-	a.selectorCacheProfile = ""
-	a.selectorCacheLive = false
-	a.selectorCacheExpiresAt = time.Time{}
-	a.selectorCacheGroups = nil
+	a.clearSelectorCacheLocked()
 }
 
 func (a *App) invalidateSelectorCache() {
 	a.clashMu.Lock()
 	defer a.clashMu.Unlock()
+	a.clearSelectorCacheLocked()
+}
+
+func (a *App) clearSelectorCacheLocked() {
 	a.selectorCacheProfile = ""
 	a.selectorCacheLive = false
 	a.selectorCacheExpiresAt = time.Time{}
@@ -650,11 +650,13 @@ func (a *App) clashSwitchSelectorWithRetry(selectorTag, outboundTag string, maxT
 
 func (a *App) clashAPIRequest(method, route string, payload any, out any) error {
 	controller, secret, _ := a.clashSessionSnapshot()
-	if strings.TrimSpace(controller) == "" {
+	controller = strings.TrimSpace(controller)
+	if controller == "" {
 		return errors.New("clash api не инициализирован")
 	}
+	secret = strings.TrimSpace(secret)
 
-	endpoint := "http://" + strings.TrimSpace(controller) + route
+	endpoint := "http://" + controller + route
 	var body io.Reader
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
@@ -671,12 +673,11 @@ func (a *App) clashAPIRequest(method, route string, payload any, out any) error 
 	if payload != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if strings.TrimSpace(secret) != "" {
-		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(secret))
+	if secret != "" {
+		req.Header.Set("Authorization", "Bearer "+secret)
 	}
 
-	client := &http.Client{Timeout: clashAPIRequestTimeout}
-	resp, err := client.Do(req)
+	resp, err := clashAPIHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -786,6 +787,7 @@ func (a *App) selectorGroupsForSelection(profile ConfigProfile, running bool) ([
 }
 
 func (a *App) setSelectorOutbound(selectorTag, outboundTag string) error {
+	startedAt := time.Now()
 	a.runMu.Lock()
 	busy := a.runningAction
 	a.runMu.Unlock()
@@ -809,18 +811,28 @@ func (a *App) setSelectorOutbound(selectorTag, outboundTag string) error {
 	}
 	active := cfg.Profiles[idx]
 	running := a.isProcessRunning()
+	profileName := strings.TrimSpace(active.Name)
+	if profileName == "" {
+		profileName = "profile-1"
+	}
+	a.log("SELECTOR: запрос переключения profile=%q selector=%q outbound=%q running=%t", profileName, selectorTag, outboundTag, running)
 
 	groups, live, sourceErr := a.selectorGroupsForSelection(active, running)
 	if len(groups) == 0 && sourceErr != nil {
+		a.log("WARN: SELECTOR: невозможно получить группы selector %q: %v", selectorTag, sourceErr)
 		return sourceErr
 	}
 	group, ok := findSelectorGroup(groups, selectorTag)
 	if !ok {
-		return fmt.Errorf("selector %q не найден", selectorTag)
+		err := fmt.Errorf("selector %q не найден", selectorTag)
+		a.log("WARN: SELECTOR: %v", err)
+		return err
 	}
 	resolvedOutbound, ok := optionForGroup(group, outboundTag)
 	if !ok {
-		return fmt.Errorf("outbound %q не найден в selector %q", outboundTag, group.Name)
+		err := fmt.Errorf("outbound %q не найден в selector %q", outboundTag, group.Name)
+		a.log("WARN: SELECTOR: %v", err)
+		return err
 	}
 
 	selections := normalizeSelectorSelections(cfg.Profiles[idx].SelectorSelections)
@@ -831,28 +843,40 @@ func (a *App) setSelectorOutbound(selectorTag, outboundTag string) error {
 	cfg.Profiles[idx].SelectorSelections = selections
 	syncLegacyFromCurrent(&cfg)
 	if err := a.persistConfig(cfg); err != nil {
+		a.log("WARN: SELECTOR: не удалось сохранить выбор %q -> %q: %v", group.Name, resolvedOutbound, err)
 		return err
 	}
 	a.invalidateSelectorCache()
 
 	if !running {
+		a.log("SELECTOR: сохранено %q -> %q (core stopped, %d ms)", group.Name, resolvedOutbound, time.Since(startedAt).Milliseconds())
 		return nil
 	}
 	if !live {
 		if err := a.clashSwitchSelectorWithRetry(group.Name, resolvedOutbound, 3); err == nil {
 			a.invalidateSelectorCache()
+			a.log("SELECTOR: переключено %q -> %q (runtime fallback, %d ms)", group.Name, resolvedOutbound, time.Since(startedAt).Milliseconds())
 			return nil
+		} else {
+			a.log("WARN: SELECTOR: clash api переключение %q -> %q завершилось ошибкой: %v", group.Name, resolvedOutbound, err)
 		}
 		if sourceErr != nil {
-			return fmt.Errorf("live переключение selector недоступно: %w", sourceErr)
+			wrappedErr := fmt.Errorf("live переключение selector недоступно: %w", sourceErr)
+			a.log("WARN: SELECTOR: %v", wrappedErr)
+			return wrappedErr
 		}
-		return errors.New("live переключение selector недоступно")
+		err := errors.New("live переключение selector недоступно")
+		a.log("WARN: SELECTOR: %v", err)
+		return err
 	}
 
 	if err := a.clashSwitchSelectorWithRetry(group.Name, resolvedOutbound, 3); err != nil {
-		return fmt.Errorf("не удалось переключить selector %q: %w", group.Name, err)
+		wrappedErr := fmt.Errorf("не удалось переключить selector %q: %w", group.Name, err)
+		a.log("WARN: SELECTOR: %v", wrappedErr)
+		return wrappedErr
 	}
 	a.invalidateSelectorCache()
+	a.log("SELECTOR: переключено %q -> %q (live, %d ms)", group.Name, resolvedOutbound, time.Since(startedAt).Milliseconds())
 	return nil
 }
 
