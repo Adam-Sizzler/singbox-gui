@@ -82,7 +82,6 @@
   var settingsGeneralTitleNode = document.getElementById("settingsGeneralTitle");
   var labelLanguageNode = document.getElementById("labelLanguage");
   var labelProfileNameNode = document.getElementById("labelProfileName");
-  var settingsHWIDTextNode = document.getElementById("settingsHWIDText");
   var sidebarStatusLabelNode = document.getElementById("sidebarStatusLabel");
   var sidebarThemeCycleBtn = document.getElementById("sidebarThemeCycle");
   var sidebarThemeIconNode = document.getElementById("sidebarThemeIcon");
@@ -140,7 +139,6 @@
   var lastAppLatestReleaseURL = "";
   var currentThemeMode = "auto";
   var currentThemeDark = true;
-  var lastHWID = "";
   var lastAppliedUIScale = null;
   var lastVisibilitySyncAt = 0;
   var initialStateRendered = false;
@@ -160,6 +158,10 @@
   var MAX_FILTER_PATTERN_LEN = 256;
   var ANSI_ESC_RAW_MARKER = "\x1b[";
   var ANSI_ESC_FALLBACK_MARKER = "\u2190[";
+  var HIRES_UI_WIDTH_THRESHOLD = 3200;
+  var HIRES_UI_HEIGHT_THRESHOLD = 1800;
+  var HIRES_UI_SCALE = 0.8;
+  var lastDisplayScale = null;
 
   var I18N = {
     ru: {
@@ -176,14 +178,13 @@
       settingsGeneral: "Общие параметры",
       languageLabel: "Язык:",
       profileName: "Имя профиля:",
-      hwidLabel: "hwid:",
       sidebarStatus: "Статус",
-      releaseLabel: "Версия:",
+      releaseLabel: "Вер. приложения:",
       themeAuto: "Авто",
       themeLight: "Светлая",
       themeDark: "Тёмная",
       configUrl: "Ссылка:",
-      version: "Версия ядра:",
+      version: "Версия singbox:",
       autoUpdate: "Автообновление (часы):",
       autoStartCore: "Автозапуск ядра",
       startMinimizedTray: "Запуск в трее",
@@ -192,7 +193,7 @@
       selectorEmpty: "Нет доступных селекторов",
       runCheck: "Запуск:",
       checkConfigLabel: "Проверка:",
-      uptimeLabel: "Аптайм:",
+      uptimeLabel: "Время работы:",
       checkConfig: "Проверить",
       newProfile: "Новый",
       deleteProfile: "Удалить",
@@ -208,7 +209,7 @@
       statusConfigOk: "Конфигурация валидна",
       statusRunning: "Ядро запущено",
       statusStopped: "Ядро остановлено",
-      uptime: "Аптайм",
+      uptime: "Время работы",
       statusLogsCleared: "Логи очищены",
       statusLogsCopied: "Логи скопированы в буфер обмена",
       profilesEmpty: "Профили отсутствуют",
@@ -239,14 +240,13 @@
       settingsGeneral: "General settings",
       languageLabel: "Language:",
       profileName: "Profile name:",
-      hwidLabel: "hwid:",
       sidebarStatus: "Status",
       releaseLabel: "Version:",
       themeAuto: "Auto",
       themeLight: "Light",
       themeDark: "Dark",
       configUrl: "Config URL:",
-      version: "Core version:",
+      version: "Singbox version:",
       autoUpdate: "Auto-update (hours):",
       autoStartCore: "Auto start core",
       startMinimizedTray: "Start in tray",
@@ -502,8 +502,31 @@
     return parsed;
   }
 
+  function detectDisplayScale() {
+    var viewportWidth = window.innerWidth || (document.documentElement && document.documentElement.clientWidth) || 0;
+    var viewportHeight = window.innerHeight || (document.documentElement && document.documentElement.clientHeight) || 0;
+    var screenWidth = (window.screen && (window.screen.width || window.screen.availWidth)) || 0;
+    var screenHeight = (window.screen && (window.screen.height || window.screen.availHeight)) || 0;
+
+    var width = Math.max(viewportWidth, screenWidth);
+    var height = Math.max(viewportHeight, screenHeight);
+    if (width >= HIRES_UI_WIDTH_THRESHOLD && height >= HIRES_UI_HEIGHT_THRESHOLD) {
+      return HIRES_UI_SCALE;
+    }
+    return 1;
+  }
+
+  function applyDisplayScale() {
+    if (!document || !document.documentElement || !document.documentElement.style) return;
+    var nextScale = detectDisplayScale();
+    if (lastDisplayScale === nextScale) return;
+    lastDisplayScale = nextScale;
+    document.documentElement.style.setProperty("--ui-display-scale", String(nextScale));
+  }
+
   function applyUIScale(scale) {
     var normalized = normalizeUIScale(scale);
+    applyDisplayScale();
     if (!document || !document.body || !document.body.style) {
       return;
     }
@@ -692,9 +715,6 @@
 
     if (mobileActionsToggleBtn) {
       mobileActionsToggleBtn.setAttribute("aria-label", tr("actionsMenu"));
-    }
-    if (settingsHWIDTextNode) {
-      settingsHWIDTextNode.textContent = tr("hwidLabel") + " " + (lastHWID || "-");
     }
     applyThemeModeControls();
     renderSelectorGroups(selectorGroups);
@@ -1647,7 +1667,6 @@
     } else {
       currentThemeDark = currentThemeMode === "dark" ? true : (currentThemeMode === "light" ? false : currentThemeDark);
     }
-    lastHWID = String(state.hwid || "").trim();
     applyThemeAppearance();
     applyThemeModeControls();
 
@@ -1711,9 +1730,6 @@
     lastAppUpdateAvailable = !!state.app_update_available;
     lastAppLatestReleaseTag = String(state.app_latest_release_tag || "").trim();
     lastAppLatestReleaseURL = String(state.app_latest_release_url || "").trim();
-    if (settingsHWIDTextNode) {
-      settingsHWIDTextNode.textContent = tr("hwidLabel") + " " + (lastHWID || "-");
-    }
     renderAppVersion(lastAppReleaseTag);
     renderSelectorGroups(nextSelectorGroups);
     if (startStopBtn) {
@@ -2431,6 +2447,7 @@
   });
 
   window.addEventListener("resize", function () {
+    applyDisplayScale();
     repositionOpenSelectorMenu();
   });
 
@@ -2654,6 +2671,7 @@
   // initially hidden by the host before first show.
   applyThemeAppearance();
   applyThemeModeControls();
+  applyDisplayScale();
   lastVisibilitySyncAt = Date.now();
   syncStateAndLogs(true);
   if (!document.hidden) {

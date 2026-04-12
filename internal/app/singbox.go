@@ -103,7 +103,7 @@ func downloadAndInstallSingBox(version, targetExe string) error {
 func downloadRuntimeConfig(url, target string) (bool, error) {
 	targetName := filepath.Base(target)
 	tmpPath := target + ".download.tmp"
-	if err := downloadFile(url, tmpPath, map[string]string{"User-Agent": appUserAgent()}); err != nil {
+	if err := downloadFile(url, tmpPath, subscriptionRequestHeaders()); err != nil {
 		return false, fmt.Errorf("не удалось скачать %s: %w", targetName, err)
 	}
 	defer os.Remove(tmpPath)
@@ -164,11 +164,21 @@ func ensureLocalRuntimeConfig(target string) error {
 
 func validateRemoteRuntimeConfig(url string) error {
 	tmpPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-wrapper-config-check-%d.json", time.Now().UnixNano()))
-	if err := downloadFile(url, tmpPath, map[string]string{"User-Agent": appUserAgent()}); err != nil {
+	if err := downloadFile(url, tmpPath, subscriptionRequestHeaders()); err != nil {
 		return fmt.Errorf("не удалось скачать runtime-конфиг: %w", err)
 	}
 	defer os.Remove(tmpPath)
 	return validateRuntimeConfigFile(tmpPath)
+}
+
+func subscriptionRequestHeaders() map[string]string {
+	headers := map[string]string{
+		"User-Agent": appUserAgent(),
+	}
+	if hwid := strings.TrimSpace(appHWID()); hwid != "" {
+		headers["x-hwid"] = hwid
+	}
+	return headers
 }
 
 func validateRuntimeConfigFile(path string) error {
