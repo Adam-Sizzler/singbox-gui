@@ -1,7 +1,8 @@
 :root {
   --mantine-scale: 1.25;
   --ui-responsive-scale: 1;
-  --ui-scale: calc(var(--mantine-scale) * var(--ui-responsive-scale));
+  --ui-display-scale: 1;
+  --ui-scale: calc(var(--mantine-scale) * var(--ui-responsive-scale) * var(--ui-display-scale));
   --ui-base-px: 1px;
   --ui-px: calc(var(--ui-base-px) * var(--ui-scale));
   --button-bd: calc(var(--ui-base-px) * var(--mantine-scale));
@@ -249,11 +250,6 @@ body.ui-loading .app-shell {
 .sidebar-nav-btn.active {
   background: var(--ui-accent);
   color: var(--ui-accent-text);
-  font-weight: 700;
-}
-
-.sidebar-nav-item.active .sidebar-nav-text {
-  color: var(--ui-accent);
   font-weight: 700;
 }
 
@@ -1266,16 +1262,6 @@ input.logs-filter::placeholder {
   opacity: 0.6;
 }
 
-.settings-hwid-text {
-  margin-top: auto;
-  width: 100%;
-  text-align: center;
-  font-size: var(--ui-font-xs);
-  color: var(--ui-muted);
-  user-select: text;
-  line-height: 1.35;
-}
-
 #screenSettings .settings-grid {
   flex: 1 1 auto;
 }
@@ -1343,11 +1329,6 @@ body.theme-light .profile-option.active {
 
 body.theme-light .release-menu-link:hover {
   color: var(--ui-text);
-}
-
-body.theme-light .sidebar-nav-item.active .sidebar-nav-text {
-  color: var(--ui-accent);
-  font-weight: 700;
 }
 
 body.theme-light .sidebar-brand,
