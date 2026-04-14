@@ -22,6 +22,8 @@ var (
 	procSetCtrlHandler    = kernel32DLL.NewProc("SetConsoleCtrlHandler")
 )
 
+const uiConfigActionTimeout = 5 * time.Second
+
 func (a *App) isProcessRunning() bool {
 	a.procMu.Lock()
 	defer a.procMu.Unlock()
@@ -97,10 +99,43 @@ func (a *App) checkConfigAction() error {
 			return nil
 		}
 
-		if err := validateRemoteRuntimeConfig(resolvedConfigURL); err != nil {
+		if err := validateRemoteRuntimeConfigWithTimeout(resolvedConfigURL, uiConfigActionTimeout); err != nil {
 			return err
 		}
 		a.log("Проверка конфигурации OK: URL доступен и JSON валиден (профиль: %s)", profileName)
+		return nil
+	})
+}
+
+func (a *App) refreshConfigAction() error {
+	return a.withRunningAction(func() error {
+		cfg := a.getConfigSnapshot()
+		if err := validateConfig(cfg); err != nil {
+			return err
+		}
+
+		profileName, runtimeCfgPath, runtimeCfgFile, resolvedConfigURL, updated, err := a.refreshActiveProfileRuntimeConfigFromURL(uiConfigActionTimeout)
+		if err != nil {
+			return err
+		}
+
+		if strings.TrimSpace(resolvedConfigURL) == "" {
+			if err := a.ensureLocalRuntimeConfig(runtimeCfgPath); err != nil {
+				return err
+			}
+			a.log("Конфигурация обновлена: подготовлен локальный %s (профиль: %s)", runtimeCfgFile, profileName)
+		} else {
+			if updated {
+				a.log("Конфигурация обновлена: %s (профиль: %s)", runtimeCfgFile, profileName)
+				a.invalidateSelectorCache()
+			} else {
+				a.log("Конфигурация уже актуальна: %s (профиль: %s)", runtimeCfgFile, profileName)
+			}
+		}
+
+		if a.isProcessRunning() {
+			a.log("Для применения обновлённого конфига перезапустите ядро")
+		}
 		return nil
 	})
 }
@@ -224,9 +259,13 @@ func (a *App) ensureLocalRuntimeConfig(runtimeCfgPath string) error {
 }
 
 func (a *App) refreshRuntimeConfigFromURL(url, runtimeCfgPath string) (bool, error) {
+	return a.refreshRuntimeConfigFromURLWithTimeout(url, runtimeCfgPath, 0)
+}
+
+func (a *App) refreshRuntimeConfigFromURLWithTimeout(url, runtimeCfgPath string, timeout time.Duration) (bool, error) {
 	a.runtimeCfgMu.Lock()
 	defer a.runtimeCfgMu.Unlock()
-	return downloadRuntimeConfig(url, runtimeCfgPath)
+	return downloadRuntimeConfigWithTimeout(url, runtimeCfgPath, timeout)
 }
 
 func (a *App) ensureSingBox(targetVersion string) error {

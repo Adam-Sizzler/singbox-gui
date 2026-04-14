@@ -18,6 +18,7 @@
   var selectorBlockNode = document.getElementById("selectorBlock");
   var selectorGroupsNode = document.getElementById("selectorGroups");
   var checkConfigBtn = document.getElementById("checkConfig");
+  var refreshConfigBtn = document.getElementById("refreshConfig");
   var startStopBtn = document.getElementById("startStop");
   var clearLogsBtn = document.getElementById("clearLogs");
   var copyLogsBtn = document.getElementById("copyLogs");
@@ -25,6 +26,7 @@
   var mobileActionsToggleBtn = document.getElementById("mobileActionsToggle");
   var mobileActionsMenu = document.getElementById("mobileActionsMenu");
   var mobileActionCheckConfigBtn = document.getElementById("mobileActionCheckConfig");
+  var mobileActionRefreshConfigBtn = document.getElementById("mobileActionRefreshConfig");
   var mobileActionCopyLogsBtn = document.getElementById("mobileActionCopyLogs");
   var toastStack = document.getElementById("toastStack");
   var statusNode = document.getElementById("status");
@@ -112,6 +114,7 @@
   var logsFilterRegex = null;
   var logsHighlightRegex = null;
   var logsFilterError = "";
+  var logsInitialized = false;
   var profileNames = [];
   var selectedProfile = "";
   var profileMenuOpened = false;
@@ -195,6 +198,7 @@
       checkConfigLabel: "Проверка:",
       uptimeLabel: "Время работы:",
       checkConfig: "Проверить",
+      refreshConfig: "Обновить",
       newProfile: "Новый",
       deleteProfile: "Удалить",
       start: "Старт",
@@ -207,6 +211,8 @@
       actionsMenu: "Действия",
       statusBusy: "Выполняется операция...",
       statusConfigOk: "Конфигурация валидна",
+      statusConfigUpdated: "Обновление конфигурации завершено",
+      statusConfigAutoUpdated: "Конфиг обновлён автоматически",
       statusRunning: "Ядро запущено",
       statusStopped: "Ядро остановлено",
       uptime: "Время работы",
@@ -257,6 +263,7 @@
       checkConfigLabel: "Check:",
       uptimeLabel: "Uptime:",
       checkConfig: "Check",
+      refreshConfig: "Refresh",
       newProfile: "New",
       deleteProfile: "Delete",
       start: "Start",
@@ -269,6 +276,8 @@
       actionsMenu: "Actions",
       statusBusy: "Operation in progress...",
       statusConfigOk: "Configuration is valid",
+      statusConfigUpdated: "Configuration refresh completed",
+      statusConfigAutoUpdated: "Config updated automatically",
       statusRunning: "Core is running",
       statusStopped: "Core is stopped",
       uptime: "Uptime",
@@ -676,6 +685,7 @@
     if (labelUptimeNode) labelUptimeNode.textContent = tr("uptimeLabel");
     if (labelCheckConfigNode) labelCheckConfigNode.textContent = tr("checkConfigLabel");
     if (checkConfigBtn) checkConfigBtn.textContent = tr("checkConfig");
+    if (refreshConfigBtn) refreshConfigBtn.textContent = tr("refreshConfig");
     if (newProfileBtn) newProfileBtn.textContent = tr("newProfile");
     if (deleteProfileBtn) deleteProfileBtn.textContent = tr("deleteProfile");
     if (clearLogsBtn) clearLogsBtn.textContent = tr("clearLogs");
@@ -687,6 +697,7 @@
     }
     if (mobileActionsToggleBtn) mobileActionsToggleBtn.textContent = tr("actionsMenu");
     if (mobileActionCheckConfigBtn) mobileActionCheckConfigBtn.textContent = tr("checkConfig");
+    if (mobileActionRefreshConfigBtn) mobileActionRefreshConfigBtn.textContent = tr("refreshConfig");
     if (mobileActionCopyLogsBtn) mobileActionCopyLogsBtn.textContent = tr("copyLogs");
     if (startStopBtn) startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
     renderStartStopIndicator();
@@ -1078,7 +1089,9 @@
   function setCheckButtonsDisabled(disabled) {
     var next = !!disabled;
     if (checkConfigBtn) checkConfigBtn.disabled = next;
+    if (refreshConfigBtn) refreshConfigBtn.disabled = next;
     if (mobileActionCheckConfigBtn) mobileActionCheckConfigBtn.disabled = next;
+    if (mobileActionRefreshConfigBtn) mobileActionRefreshConfigBtn.disabled = next;
   }
 
   function setCopyButtonsDisabled(disabled) {
@@ -1593,6 +1606,21 @@
       }
       renderState(state);
       showToast("success", tr("statusConfigOk"));
+    });
+  }
+
+  function runRefreshConfigAction() {
+    if (lastBusy) return;
+    setCheckButtonsDisabled(true);
+    api("POST", "/api/action/refresh-config", {}, function (err, state) {
+      if (err) {
+        setStatus(tr("errorPrefix") + err.message);
+        showToast("error", tr("errorPrefix") + err.message);
+        refreshState(true);
+        return;
+      }
+      renderState(state);
+      showToast("success", tr("statusConfigUpdated"));
     });
   }
 
@@ -2278,6 +2306,18 @@
     logsNode.scrollTop = Math.max(0, Math.min(maxScrollTop, prevScrollTop));
   }
 
+  function maybeNotifyAutoConfigUpdated(entries) {
+    if (!logsInitialized || !entries || !entries.length) return;
+    for (var i = 0; i < entries.length; i++) {
+      var raw = entries[i] || {};
+      var text = String(raw.text || "");
+      if (text.indexOf("Автообновление: обновлён ") >= 0) {
+        showToast("success", tr("statusConfigAutoUpdated"));
+        return;
+      }
+    }
+  }
+
   function pollLogs(force) {
     if (document.hidden && !force) {
       if (pollingActive) {
@@ -2298,11 +2338,13 @@
       }
       var entries = data.entries || [];
       appendLogs(entries);
+      maybeNotifyAutoConfigUpdated(entries);
 
       var parsedLastId = parseInt(data.last_id, 10);
       if (!isNaN(parsedLastId) && parsedLastId >= 0) {
         lastLogId = parsedLastId;
       }
+      logsInitialized = true;
 
       if (entries.length > 0) {
         logsPollDelay = LOGS_POLL_MIN_MS;
@@ -2486,6 +2528,13 @@
     };
   }
 
+  if (mobileActionRefreshConfigBtn) {
+    mobileActionRefreshConfigBtn.onclick = function () {
+      closeMobileActionsMenu();
+      runRefreshConfigAction();
+    };
+  }
+
   if (mobileActionCopyLogsBtn) {
     mobileActionCopyLogsBtn.onclick = function () {
       closeMobileActionsMenu();
@@ -2627,6 +2676,12 @@
   if (checkConfigBtn) {
     checkConfigBtn.onclick = function () {
       runCheckConfigAction();
+    };
+  }
+
+  if (refreshConfigBtn) {
+    refreshConfigBtn.onclick = function () {
+      runRefreshConfigAction();
     };
   }
 

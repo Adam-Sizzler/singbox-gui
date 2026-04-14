@@ -128,6 +128,11 @@ func (a *App) handleUIBridgeCall(req uiBridgeRequest) (any, error) {
 				return nil, err
 			}
 			return a.snapshotState(), nil
+		case "/api/action/refresh-config":
+			if err := a.refreshConfigAction(); err != nil {
+				return nil, err
+			}
+			return a.snapshotState(), nil
 		case "/api/action/copy-logs":
 			if err := a.copyLogsToClipboard(); err != nil {
 				return nil, err
