@@ -108,15 +108,7 @@ func (a *App) runAutoUpdateOnce() {
 		return
 	}
 
-	active := activeProfileFromConfig(cfg)
-	profileName := strings.TrimSpace(active.Name)
-	if profileName == "" {
-		profileName = "profile-1"
-	}
-	runtimeCfgPath := a.runtimeConfigPathForProfile(profileName)
-	runtimeCfgFile := filepath.Base(runtimeCfgPath)
-
-	resolvedConfigURL, _, _, err := resolveSubscriptionInput(active.URL)
+	profileName, _, runtimeCfgFile, resolvedConfigURL, updated, err := a.refreshActiveProfileRuntimeConfigFromURL(0)
 	if err != nil {
 		a.log("WARN: автообновление профиля %s пропущено: %v", profileName, err)
 		return
@@ -124,14 +116,34 @@ func (a *App) runAutoUpdateOnce() {
 	if strings.TrimSpace(resolvedConfigURL) == "" {
 		return
 	}
-
-	updated, err := a.refreshRuntimeConfigFromURL(resolvedConfigURL, runtimeCfgPath)
-	if err != nil {
-		a.log("WARN: автообновление профиля %s: %v", profileName, err)
-		return
-	}
 	if updated {
 		a.invalidateSelectorCache()
 		a.log("Автообновление: обновлён %s (профиль: %s)", runtimeCfgFile, profileName)
 	}
+}
+
+func (a *App) refreshActiveProfileRuntimeConfigFromURL(timeout time.Duration) (profileName string, runtimeCfgPath string, runtimeCfgFile string, resolvedConfigURL string, updated bool, err error) {
+	cfg := a.getConfigSnapshot()
+	active := activeProfileFromConfig(cfg)
+
+	profileName = strings.TrimSpace(active.Name)
+	if profileName == "" {
+		profileName = "profile-1"
+	}
+	runtimeCfgPath = a.runtimeConfigPathForProfile(profileName)
+	runtimeCfgFile = filepath.Base(runtimeCfgPath)
+
+	resolvedConfigURL, _, _, err = resolveSubscriptionInput(active.URL)
+	if err != nil {
+		return profileName, runtimeCfgPath, runtimeCfgFile, "", false, err
+	}
+	if strings.TrimSpace(resolvedConfigURL) == "" {
+		return profileName, runtimeCfgPath, runtimeCfgFile, "", false, nil
+	}
+
+	updated, err = a.refreshRuntimeConfigFromURLWithTimeout(resolvedConfigURL, runtimeCfgPath, timeout)
+	if err != nil {
+		return profileName, runtimeCfgPath, runtimeCfgFile, resolvedConfigURL, false, err
+	}
+	return profileName, runtimeCfgPath, runtimeCfgFile, resolvedConfigURL, updated, nil
 }

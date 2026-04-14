@@ -5,16 +5,20 @@ package app
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
+
+const defaultDownloadTimeout = 60 * time.Second
 
 func resolveVersion(version string) (string, error) {
 	v := strings.TrimSpace(strings.TrimPrefix(version, "v"))
@@ -101,9 +105,13 @@ func downloadAndInstallSingBox(version, targetExe string) error {
 }
 
 func downloadRuntimeConfig(url, target string) (bool, error) {
+	return downloadRuntimeConfigWithTimeout(url, target, 0)
+}
+
+func downloadRuntimeConfigWithTimeout(url, target string, timeout time.Duration) (bool, error) {
 	targetName := filepath.Base(target)
 	tmpPath := target + ".download.tmp"
-	if err := downloadFile(url, tmpPath, subscriptionRequestHeaders()); err != nil {
+	if err := downloadFileWithTimeout(url, tmpPath, subscriptionRequestHeaders(), timeout); err != nil {
 		return false, fmt.Errorf("не удалось скачать %s: %w", targetName, err)
 	}
 	defer os.Remove(tmpPath)
@@ -163,8 +171,12 @@ func ensureLocalRuntimeConfig(target string) error {
 }
 
 func validateRemoteRuntimeConfig(url string) error {
+	return validateRemoteRuntimeConfigWithTimeout(url, 0)
+}
+
+func validateRemoteRuntimeConfigWithTimeout(url string, timeout time.Duration) error {
 	tmpPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-wrapper-config-check-%d.json", time.Now().UnixNano()))
-	if err := downloadFile(url, tmpPath, subscriptionRequestHeaders()); err != nil {
+	if err := downloadFileWithTimeout(url, tmpPath, subscriptionRequestHeaders(), timeout); err != nil {
 		return fmt.Errorf("не удалось скачать runtime-конфиг: %w", err)
 	}
 	defer os.Remove(tmpPath)
@@ -193,7 +205,18 @@ func validateRuntimeConfigFile(path string) error {
 }
 
 func downloadFile(url, target string, headers map[string]string) error {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	return downloadFileWithTimeout(url, target, headers, 0)
+}
+
+func downloadFileWithTimeout(url, target string, headers map[string]string, timeout time.Duration) error {
+	if timeout <= 0 {
+		timeout = defaultDownloadTimeout
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
@@ -201,9 +224,31 @@ func downloadFile(url, target string, headers map[string]string) error {
 		req.Header.Set(k, v)
 	}
 
-	client := &http.Client{Timeout: 60 * time.Second}
+	dialTimeout := timeout / 2
+	if dialTimeout < time.Second {
+		dialTimeout = time.Second
+	}
+	client := &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   dialTimeout,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout:   dialTimeout,
+			ResponseHeaderTimeout: timeout,
+			ExpectContinueTimeout: time.Second,
+			IdleConnTimeout:       30 * time.Second,
+			ForceAttemptHTTP2:     true,
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
+		var netErr net.Error
+		if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()) {
+			return fmt.Errorf("превышено время ожидания (%s)", timeout.Round(time.Second))
+		}
 		return err
 	}
 	defer resp.Body.Close()
