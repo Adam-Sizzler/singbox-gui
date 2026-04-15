@@ -184,13 +184,11 @@ func validateRemoteRuntimeConfigWithTimeout(url string, timeout time.Duration) e
 }
 
 func subscriptionRequestHeaders() map[string]string {
-	headers := map[string]string{
+	// Keep subscription fetch behavior stable: runtime config providers are
+	// expected to rely on User-Agent only.
+	return map[string]string{
 		"User-Agent": appUserAgent(),
 	}
-	if hwid := strings.TrimSpace(appHWID()); hwid != "" {
-		headers["x-hwid"] = hwid
-	}
-	return headers
 }
 
 func validateRuntimeConfigFile(path string) error {
