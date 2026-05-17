@@ -31,7 +31,6 @@
   var mobileActionCopyLogsBtn = document.getElementById("mobileActionCopyLogs");
   var toastStack = document.getElementById("toastStack");
   var statusNode = document.getElementById("status");
-  var uptimeNode = document.getElementById("uptime");
   var logsNode = document.getElementById("logs");
   var logsFilterInput = document.getElementById("logsFilter");
   var settingsTitleNode = document.getElementById("settingsTitle");
@@ -56,8 +55,6 @@
   var labelInsecureToggleNode = document.getElementById("labelInsecureToggle");
   var labelProfileNode = document.getElementById("labelProfile");
   var labelSelectorNode = document.getElementById("labelSelector");
-  var labelRunCheckNode = document.getElementById("labelRunCheck");
-  var labelUptimeNode = document.getElementById("labelUptime");
   var labelCheckConfigNode = document.getElementById("labelCheckConfig");
   var langRuBtn = document.getElementById("langRu");
   var langEnBtn = document.getElementById("langEn");
@@ -209,7 +206,6 @@
       selectorDelayNeedRun: "Запустите ядро для проверки задержки",
       runCheck: "Запуск:",
       checkConfigLabel: "Проверка:",
-      uptimeLabel: "Время работы:",
       checkConfig: "Проверить",
       refreshConfig: "Обновить",
       newProfile: "Новый",
@@ -281,7 +277,6 @@
       selectorDelayNeedRun: "Start the core to check delay",
       runCheck: "Run:",
       checkConfigLabel: "Check:",
-      uptimeLabel: "Uptime:",
       checkConfig: "Check",
       refreshConfig: "Refresh",
       newProfile: "New",
@@ -406,7 +401,17 @@
   function renderStartStopIndicator() {
     if (!startStopBtn) return;
     startStopBtn.className = lastRunning ? "control core-running" : "control";
+    renderStartStopText();
     renderSidebarStatus();
+  }
+
+  function renderStartStopText() {
+    if (!startStopBtn) return;
+    startStopBtn.innerHTML = lastRunning
+      ? '<span class="start-stop-uptime">' + formatUptime(lastUptimeSeconds) + '</span>'
+      : '<svg class="start-stop-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v8"></path><path d="M7.05 6.9a7 7 0 1 0 9.9 0"></path></svg>';
+    startStopBtn.title = lastRunning ? tr("stop") : tr("start");
+    startStopBtn.setAttribute("aria-label", startStopBtn.title);
   }
 
   function normalizeLanguage(raw) {
@@ -702,8 +707,6 @@
     if (labelInsecureToggleNode) labelInsecureToggleNode.textContent = tr("allowInsecure");
     if (labelProfileNode) labelProfileNode.textContent = tr("profile");
     if (labelSelectorNode) labelSelectorNode.textContent = tr("selector");
-    if (labelRunCheckNode) labelRunCheckNode.textContent = tr("runCheck");
-    if (labelUptimeNode) labelUptimeNode.textContent = tr("uptimeLabel");
     if (labelCheckConfigNode) labelCheckConfigNode.textContent = tr("checkConfigLabel");
     if (checkConfigBtn) checkConfigBtn.textContent = tr("checkConfig");
     if (refreshConfigBtn) refreshConfigBtn.textContent = tr("refreshConfig");
@@ -720,7 +723,7 @@
     if (mobileActionCheckConfigBtn) mobileActionCheckConfigBtn.textContent = tr("checkConfig");
     if (mobileActionRefreshConfigBtn) mobileActionRefreshConfigBtn.textContent = tr("refreshConfig");
     if (mobileActionCopyLogsBtn) mobileActionCopyLogsBtn.textContent = tr("copyLogs");
-    if (startStopBtn) startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
+    renderStartStopText();
     renderStartStopIndicator();
     if (releaseCurrentCaptionNode) releaseCurrentCaptionNode.textContent = tr("releaseCurrent");
     if (releaseLatestCaptionNode) releaseLatestCaptionNode.textContent = tr("releaseLatest");
@@ -885,9 +888,7 @@
   }
 
   function renderUptime(uptimeSeconds, running) {
-    if (!uptimeNode) return;
-    var shown = running ? formatUptime(uptimeSeconds) : "00:00:00";
-    uptimeNode.textContent = shown;
+    renderStartStopText();
   }
 
   function setLanguage(next, persist) {
@@ -1967,9 +1968,7 @@
     if (languageChanged || needsInitialLanguageApply) {
       applyLanguageUI();
     } else {
-      if (startStopBtn) {
-        startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
-      }
+      renderStartStopText();
       renderStartStopIndicator();
       renderUptime(lastUptimeSeconds, lastRunning);
       if (selectorGroupsChanged || prevBusy !== lastBusy || prevRunning !== lastRunning) {

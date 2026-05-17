@@ -24,6 +24,7 @@
   --ui-font-2xl: calc(24 * var(--ui-px));
   --ui-control-height: calc(40 * var(--ui-px));
   --ui-control-side: var(--ui-control-height);
+  --ui-startstop-size: calc(126 * var(--ui-px));
   --ui-content-edge-gap: calc(4 * var(--ui-px));
   --ui-bg: #313131;
   --ui-panel: #1f1f1f;
@@ -31,8 +32,8 @@
   --ui-text: #f3f3f3;
   --ui-accent: #fdd75a;
   --ui-accent-text: #2b2b2b;
-  --ui-accent-hover: #f0ca4a;
-  --ui-accent-active: #e2bb3b;
+  --ui-accent-hover: #fdd75a;
+  --ui-accent-active: #fdd75a;
   --ui-danger: #7b2424;
   --ui-danger-hover: #8b2b2b;
   --ui-danger-active: #641b1b;
@@ -50,14 +51,16 @@
   --ui-selector-option-hover: var(--ui-accent);
   --ui-selector-option-active: var(--ui-accent);
   --ui-selector-option-selected: var(--ui-accent);
-  --ui-start-btn-bg: #2f7a45;
-  --ui-start-btn-text: #f2f7f2;
-  --ui-start-btn-hover: #296c3d;
-  --ui-start-btn-active: #235e34;
-  --ui-stop-btn-bg: #8d3a3a;
-  --ui-stop-btn-text: #fff2f2;
-  --ui-stop-btn-hover: #7f3333;
-  --ui-stop-btn-active: #702d2d;
+  --ui-startstop-outer: linear-gradient(315deg, #ffe46a 0%, #f5c847 45%, #c7921c 100%);
+  --ui-startstop-inner: linear-gradient(145deg, #fff07e 0%, #fdd75a 48%, #dba62a 100%);
+  --ui-start-btn-bg: var(--ui-accent);
+  --ui-start-btn-text: var(--ui-accent-text);
+  --ui-start-btn-hover: var(--ui-accent);
+  --ui-start-btn-active: var(--ui-accent);
+  --ui-stop-btn-bg: var(--ui-accent);
+  --ui-stop-btn-text: var(--ui-accent-text);
+  --ui-stop-btn-hover: var(--ui-accent);
+  --ui-stop-btn-active: var(--ui-accent);
 }
 
 html,
@@ -81,8 +84,8 @@ body.theme-light {
   --ui-text: #1e222c;
   --ui-accent: #fdd75a;
   --ui-accent-text: #2b2b2b;
-  --ui-accent-hover: #f0ca4a;
-  --ui-accent-active: #e2bb3b;
+  --ui-accent-hover: #fdd75a;
+  --ui-accent-active: #fdd75a;
   --ui-panel-outline: var(--ui-panel);
   --ui-sidebar-control-bg: var(--ui-panel);
   --ui-sidebar-control-hover: #f1f4f8;
@@ -161,24 +164,24 @@ body.ui-loading .app-shell {
 }
 
 .sidebar-run-indicator {
-  width: calc(11 * var(--ui-px));
-  height: calc(11 * var(--ui-px));
+  width: calc(16.5 * var(--ui-px));
+  height: calc(16.5 * var(--ui-px));
   border-radius: 50%;
   background: var(--ui-stop-btn-bg);
-  box-shadow: 0 0 0 calc(2 * var(--ui-px)) rgba(141, 58, 58, 0.24);
+  box-shadow: 0 0 0 calc(3 * var(--ui-px)) rgba(253, 215, 90, 0.2);
   transition: background-color 0.12s ease, box-shadow 0.12s ease;
   flex: 0 0 auto;
 }
 
 .sidebar-run-indicator.running {
   background: var(--ui-start-btn-bg);
-  box-shadow: 0 0 0 calc(2 * var(--ui-px)) rgba(47, 122, 69, 0.3);
+  box-shadow: 0 0 0 calc(3 * var(--ui-px)) rgba(253, 215, 90, 0.28);
   animation: sidebarRunPulse 1.2s infinite ease-in-out;
 }
 
 .sidebar-run-indicator.busy {
   background: var(--ui-start-btn-bg);
-  box-shadow: 0 0 0 calc(2 * var(--ui-px)) rgba(47, 122, 69, 0.3);
+  box-shadow: 0 0 0 calc(3 * var(--ui-px)) rgba(253, 215, 90, 0.28);
   animation: sidebarRunPulse 1.2s infinite ease-in-out;
 }
 
@@ -693,46 +696,102 @@ button.control:disabled {
   width: auto;
 }
 
+.home-run-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.run-control {
+  width: 100%;
+  min-height: var(--ui-startstop-size);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 #startStop {
   position: relative;
-  padding-left: var(--ui-space-3);
-  background: var(--ui-start-btn-bg) !important;
+  width: var(--ui-startstop-size);
+  min-width: var(--ui-startstop-size);
+  max-width: var(--ui-startstop-size);
+  height: var(--ui-startstop-size);
+  min-height: var(--ui-startstop-size);
+  max-height: var(--ui-startstop-size);
+  padding: 0 !important;
+  border-radius: 50% !important;
+  background: var(--ui-startstop-outer) !important;
   color: var(--ui-start-btn-text) !important;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: normal;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 calc(3 * var(--ui-px)) rgba(67, 50, 12, 0.34);
+}
+
+#startStop::before {
+  content: "";
+  position: absolute;
+  inset: calc(16 * var(--ui-px));
+  border-radius: 50%;
+  background: var(--ui-startstop-inner);
+  box-shadow:
+    0 0 0 calc(3 * var(--ui-px)) rgba(67, 50, 12, 0.36),
+    inset calc(-8 * var(--ui-px)) calc(-9 * var(--ui-px)) calc(16 * var(--ui-px)) rgba(102, 74, 10, 0.18),
+    inset calc(6 * var(--ui-px)) calc(7 * var(--ui-px)) calc(14 * var(--ui-px)) rgba(255, 252, 183, 0.42);
+  pointer-events: none;
 }
 
 #startStop:hover {
-  background: var(--ui-start-btn-hover) !important;
+  background: var(--ui-startstop-outer) !important;
 }
 
 #startStop:active {
-  background: var(--ui-start-btn-active) !important;
+  background: var(--ui-startstop-outer) !important;
 }
 
 #startStop.core-running {
-  background: var(--ui-stop-btn-bg) !important;
+  background: var(--ui-startstop-outer) !important;
   color: var(--ui-stop-btn-text) !important;
 }
 
 #startStop.core-running:hover {
-  background: var(--ui-stop-btn-hover) !important;
+  background: var(--ui-startstop-outer) !important;
 }
 
 #startStop.core-running:active {
-  background: var(--ui-stop-btn-active) !important;
+  background: var(--ui-startstop-outer) !important;
 }
 
-.uptime {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(126 * var(--ui-px));
-  padding: 0 var(--ui-space-3);
-  height: var(--ui-control-height);
-  border-radius: var(--ui-radius-md);
-  background: var(--ui-accent);
-  color: var(--ui-accent-text);
-  font-weight: 700;
+.start-stop-icon {
+  width: calc(34 * var(--ui-px));
+  height: calc(34 * var(--ui-px));
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.78;
+  pointer-events: none;
+  position: relative;
+  z-index: 1;
+}
+
+.start-stop-uptime {
+  display: block;
+  max-width: calc(96 * var(--ui-px));
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: calc(20 * var(--ui-px));
+  line-height: 1;
+  font-weight: 400;
+  color: var(--ui-accent-text);
+  pointer-events: none;
+  position: relative;
+  z-index: 1;
 }
 
 #releaseMenuToggle {
@@ -1987,11 +2046,16 @@ body::-webkit-scrollbar-thumb:hover,
   #startStop,
   #checkConfig,
   #refreshConfig,
-  .uptime,
   #newProfile,
   #deleteProfile {
     width: 100%;
     min-width: 0;
+  }
+
+  #startStop {
+    width: var(--ui-startstop-size);
+    min-width: var(--ui-startstop-size);
+    max-width: var(--ui-startstop-size);
   }
 
   .logs-header {
