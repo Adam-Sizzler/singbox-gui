@@ -53,8 +53,6 @@
   var labelAutoStartCoreNode = document.getElementById("labelAutoStartCore");
   var labelStartMinimizedTrayNode = document.getElementById("labelStartMinimizedTray");
   var labelInsecureToggleNode = document.getElementById("labelInsecureToggle");
-  var labelProfileNode = document.getElementById("labelProfile");
-  var labelSelectorNode = document.getElementById("labelSelector");
   var labelCheckConfigNode = document.getElementById("labelCheckConfig");
   var langRuBtn = document.getElementById("langRu");
   var langEnBtn = document.getElementById("langEn");
@@ -75,7 +73,7 @@
   var homeTitleNode = document.getElementById("homeTitle");
   var profilesTitleNode = document.getElementById("profilesTitle");
   var homeActionsTitleNode = document.getElementById("homeActionsTitle");
-  var homeProfileTitleNode = document.getElementById("homeProfileTitle");
+  var homeProfileRowNode = document.getElementById("homeProfileRow");
   var profilesActionsTitleNode = document.getElementById("profilesActionsTitle");
   var labelProfileActionsNode = document.getElementById("labelProfileActions");
   var labelProfileListNode = document.getElementById("labelProfileList");
@@ -176,7 +174,6 @@
       settings: "Настройки",
       logs: "Логи",
       homeActions: "Основные действия",
-      homeProfileSection: "Профиль и селекторы",
       profileActions: "Действия профиля",
       profileActionsLabel: "Управление:",
       profileListLabel: "Профиль:",
@@ -194,10 +191,14 @@
       autoUpdate: "Автообновление (часы):",
       autoStartCore: "Автозапуск ядра",
       startMinimizedTray: "Запуск в трее",
+<<<<<<< HEAD
       allowInsecure: "Разр. небезопасные",
       profile: "Профиль:",
       selector: "Селекторы:",
       selectorEmpty: "Нет доступных селекторов",
+=======
+      allowInsecure: "Разрешить небезопасные ссылки",
+>>>>>>> a68259d (26.5.18)
       selectorPing: "Пинг",
       selectorPingTitle: "Проверить задержку",
       selectorPingBusy: "...",
@@ -247,7 +248,6 @@
       settings: "Settings",
       logs: "Logs",
       homeActions: "Primary actions",
-      homeProfileSection: "Profile and selectors",
       profileActions: "Profile actions",
       profileActionsLabel: "Manage:",
       profileListLabel: "Profile:",
@@ -265,10 +265,14 @@
       autoUpdate: "Auto-update (hours):",
       autoStartCore: "Auto start core",
       startMinimizedTray: "Start in tray",
+<<<<<<< HEAD
       allowInsecure: "Allow insecure",
       profile: "Profile:",
       selector: "Selectors:",
       selectorEmpty: "No selectors available",
+=======
+      allowInsecure: "Allow insecure links",
+>>>>>>> a68259d (26.5.18)
       selectorPing: "Ping",
       selectorPingTitle: "Check delay",
       selectorPingBusy: "...",
@@ -689,7 +693,6 @@
     if (settingsTitleNode) settingsTitleNode.textContent = tr("settings");
     if (logsTitleNode) logsTitleNode.textContent = tr("logs");
     if (homeActionsTitleNode) homeActionsTitleNode.textContent = tr("homeActions");
-    if (homeProfileTitleNode) homeProfileTitleNode.textContent = tr("homeProfileSection");
     if (profilesActionsTitleNode) profilesActionsTitleNode.textContent = tr("profileActions");
     if (labelProfileActionsNode) labelProfileActionsNode.textContent = tr("profileActionsLabel");
     if (labelProfileListNode) labelProfileListNode.textContent = tr("profileListLabel");
@@ -705,8 +708,6 @@
     if (labelAutoStartCoreNode) labelAutoStartCoreNode.textContent = tr("autoStartCore");
     if (labelStartMinimizedTrayNode) labelStartMinimizedTrayNode.textContent = tr("startMinimizedTray");
     if (labelInsecureToggleNode) labelInsecureToggleNode.textContent = tr("allowInsecure");
-    if (labelProfileNode) labelProfileNode.textContent = tr("profile");
-    if (labelSelectorNode) labelSelectorNode.textContent = tr("selector");
     if (labelCheckConfigNode) labelCheckConfigNode.textContent = tr("checkConfigLabel");
     if (checkConfigBtn) checkConfigBtn.textContent = tr("checkConfig");
     if (refreshConfigBtn) refreshConfigBtn.textContent = tr("refreshConfig");
@@ -1489,37 +1490,30 @@
     updateSelectorPingAllButton();
   }
 
+  function updateHomeRuntimeControls(hasRuntimeSelectors) {
+    var showRuntimeSelectors = !!(lastRunning && hasRuntimeSelectors);
+    if (homeProfileRowNode) {
+      homeProfileRowNode.hidden = !!lastRunning;
+    }
+    if (selectorBlockNode) {
+      selectorBlockNode.hidden = !showRuntimeSelectors;
+    }
+  }
+
   function renderSelectorGroups(nextGroups) {
     selectorGroups = nextGroups || [];
 
     if (!selectorBlockNode || !selectorGroupsNode) return;
-    selectorBlockNode.hidden = false;
-    updateSelectorPingAllButton();
-
-    if (!selectorGroups.length) {
+    if (!lastRunning || !selectorGroups.length) {
       closeSelectorMenu();
-
-      var emptyText = tr("selectorEmpty");
-      var emptyKey = "__selector_empty__:" + emptyText;
-      if (selectorGroupsRenderKey === emptyKey) {
-        return;
-      }
-
-      var emptyItem = document.createElement("div");
-      emptyItem.className = "selector-item selector-item-empty";
-
-      var emptyTextNode = document.createElement("div");
-      emptyTextNode.className = "control selector-empty-box";
-      emptyTextNode.textContent = emptyText;
-      emptyTextNode.title = emptyText;
-      emptyItem.appendChild(emptyTextNode);
-
       selectorGroupsNode.innerHTML = "";
-      selectorGroupsNode.appendChild(emptyItem);
-      selectorGroupsRenderKey = emptyKey;
-      applySelectorControlsDisabledState();
+      selectorGroupsRenderKey = "__home_runtime_hidden__";
+      updateHomeRuntimeControls(false);
       return;
     }
+
+    updateHomeRuntimeControls(true);
+    updateSelectorPingAllButton();
 
     var nextKey = buildSelectorGroupsRenderKey(selectorGroups) + ":collapsed:" + JSON.stringify(selectorCollapsedGroups || {});
     if (nextKey === selectorGroupsRenderKey) {

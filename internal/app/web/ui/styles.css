@@ -436,6 +436,18 @@ body.ui-loading .app-shell {
   min-width: 0;
 }
 
+.home-dynamic-card .field-row {
+  display: block;
+}
+
+.home-dynamic-card .field-control {
+  width: 100%;
+}
+
+.home-dynamic-card .field-row[hidden] {
+  display: none;
+}
+
 .control {
   height: var(--ui-control-height);
   border: none !important;
