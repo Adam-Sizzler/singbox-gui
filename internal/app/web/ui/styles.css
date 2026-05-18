@@ -737,7 +737,7 @@ button.control:disabled {
   border-radius: 50%;
   background: var(--ui-startstop-inner);
   box-shadow:
-    0 0 0 calc(3 * var(--ui-px)) rgba(67, 50, 12, 0.36),
+    0 0 0 calc(2 * var(--ui-px)) rgba(67, 50, 12, 0.36),
     inset calc(-8 * var(--ui-px)) calc(-9 * var(--ui-px)) calc(16 * var(--ui-px)) rgba(102, 74, 10, 0.18),
     inset calc(6 * var(--ui-px)) calc(7 * var(--ui-px)) calc(14 * var(--ui-px)) rgba(255, 252, 183, 0.42);
   pointer-events: none;
