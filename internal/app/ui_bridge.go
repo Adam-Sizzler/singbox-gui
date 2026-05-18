@@ -118,6 +118,18 @@ func (a *App) handleUIBridgeCall(req uiBridgeRequest) (any, error) {
 				return nil, err
 			}
 			return a.snapshotState(), nil
+		case "/api/selector/delay":
+			var selectorReq selectorDelayRequest
+			if err := decodeBridgeBody(req.Body, &selectorReq); err != nil {
+				return nil, err
+			}
+			return a.checkSelectorDelay(selectorReq.Selector, selectorReq.Outbound)
+		case "/api/selector/delay-all":
+			var selectorReq selectorDelayAllRequest
+			if err := decodeBridgeBody(req.Body, &selectorReq); err != nil {
+				return nil, err
+			}
+			return a.checkSelectorDelays(selectorReq.Selector)
 		case "/api/action/start-stop":
 			if err := a.toggleStartStop(); err != nil {
 				return nil, err

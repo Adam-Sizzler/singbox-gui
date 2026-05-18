@@ -82,25 +82,19 @@
             </div>
 
             <div class="screen-grid home-grid">
-              <article class="card">
-                <h2 id="homeActionsTitle">Основные действия</h2>
-
-                <div class="field-row">
-                  <label class="field-label" id="labelUptime">Время работы:</label>
-                  <div class="field-control">
-                    <div id="uptime" class="uptime"></div>
-                  </div>
+              <article class="card home-run-card">
+                <div class="run-control">
+                  <button class="control" id="startStop" type="button" aria-label="Старт" title="Старт">
+                    <svg class="start-stop-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 3v8"></path>
+                      <path d="M7.05 6.9a7 7 0 1 0 9.9 0"></path>
+                    </svg>
+                  </button>
                 </div>
 
                 <div class="field-row">
-                  <label class="field-label" id="labelRunCheck" for="startStop">Запуск:</label>
-                  <div class="field-control">
-                    <button class="control" id="startStop" type="button">Старт</button>
-                  </div>
+                  <div id="status" class="status"></div>
                 </div>
-
-                <div class="field-row">
-                <div id="status" class="status"></div>
               </article>
 
               <article class="card">
@@ -125,8 +119,8 @@
                 </div>
 
                 <div class="field-row" id="selectorBlock">
-                  <label class="field-label" id="labelSelector">Селектор:</label>
-                  <div class="field-control">
+                  <label class="field-label" id="labelSelector">Селекторы:</label>
+                  <div class="field-control selector-control">
                     <div id="selectorGroups" class="selector-groups"></div>
                   </div>
                 </div>

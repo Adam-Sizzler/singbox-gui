@@ -17,6 +17,7 @@
   var deleteProfileBtn = document.getElementById("deleteProfile");
   var selectorBlockNode = document.getElementById("selectorBlock");
   var selectorGroupsNode = document.getElementById("selectorGroups");
+  var selectorPingAllBtn = document.getElementById("selectorPingAll");
   var checkConfigBtn = document.getElementById("checkConfig");
   var refreshConfigBtn = document.getElementById("refreshConfig");
   var startStopBtn = document.getElementById("startStop");
@@ -30,7 +31,6 @@
   var mobileActionCopyLogsBtn = document.getElementById("mobileActionCopyLogs");
   var toastStack = document.getElementById("toastStack");
   var statusNode = document.getElementById("status");
-  var uptimeNode = document.getElementById("uptime");
   var logsNode = document.getElementById("logs");
   var logsFilterInput = document.getElementById("logsFilter");
   var settingsTitleNode = document.getElementById("settingsTitle");
@@ -55,8 +55,6 @@
   var labelInsecureToggleNode = document.getElementById("labelInsecureToggle");
   var labelProfileNode = document.getElementById("labelProfile");
   var labelSelectorNode = document.getElementById("labelSelector");
-  var labelRunCheckNode = document.getElementById("labelRunCheck");
-  var labelUptimeNode = document.getElementById("labelUptime");
   var labelCheckConfigNode = document.getElementById("labelCheckConfig");
   var langRuBtn = document.getElementById("langRu");
   var langEnBtn = document.getElementById("langEn");
@@ -94,7 +92,7 @@
   var screenLogsNode = document.getElementById("screenLogs");
   var screenSettingsNode = document.getElementById("screenSettings");
   var allowInsecureInput = document.getElementById("allowInsecure");
-  
+
   var lastAllowInsecure = false;
   var lastLogId = 0;
   var stateTimer = null;
@@ -136,7 +134,9 @@
   var selectorGroups = [];
   var selectorGroupsRenderKey = "";
   var selectorSwitchInFlight = false;
+  var selectorPingInFlightKey = "";
   var selectorMenuOpenName = "";
+  var selectorCollapsedGroups = {};
   var lastUptimeSeconds = 0;
   var lastAppReleaseTag = "";
   var lastAppReleaseURL = "";
@@ -196,11 +196,16 @@
       startMinimizedTray: "Запуск в трее",
       allowInsecure: "Разр. небезопасные",
       profile: "Профиль:",
-      selector: "Селектор:",
+      selector: "Селекторы:",
       selectorEmpty: "Нет доступных селекторов",
+      selectorPing: "Пинг",
+      selectorPingTitle: "Проверить задержку",
+      selectorPingBusy: "...",
+      selectorDelayUntested: "",
+      selectorDelayError: "ERR",
+      selectorDelayNeedRun: "Запустите ядро для проверки задержки",
       runCheck: "Запуск:",
       checkConfigLabel: "Проверка:",
-      uptimeLabel: "Время работы:",
       checkConfig: "Проверить",
       refreshConfig: "Обновить",
       newProfile: "Новый",
@@ -262,11 +267,16 @@
       startMinimizedTray: "Start in tray",
       allowInsecure: "Allow insecure",
       profile: "Profile:",
-      selector: "Selector:",
+      selector: "Selectors:",
       selectorEmpty: "No selectors available",
+      selectorPing: "Ping",
+      selectorPingTitle: "Check delay",
+      selectorPingBusy: "...",
+      selectorDelayUntested: "",
+      selectorDelayError: "ERR",
+      selectorDelayNeedRun: "Start the core to check delay",
       runCheck: "Run:",
       checkConfigLabel: "Check:",
-      uptimeLabel: "Uptime:",
       checkConfig: "Check",
       refreshConfig: "Refresh",
       newProfile: "New",
@@ -391,7 +401,17 @@
   function renderStartStopIndicator() {
     if (!startStopBtn) return;
     startStopBtn.className = lastRunning ? "control core-running" : "control";
+    renderStartStopText();
     renderSidebarStatus();
+  }
+
+  function renderStartStopText() {
+    if (!startStopBtn) return;
+    startStopBtn.innerHTML = lastRunning
+      ? '<span class="start-stop-uptime">' + formatUptime(lastUptimeSeconds) + '</span>'
+      : '<svg class="start-stop-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v8"></path><path d="M7.05 6.9a7 7 0 1 0 9.9 0"></path></svg>';
+    startStopBtn.title = lastRunning ? tr("stop") : tr("start");
+    startStopBtn.setAttribute("aria-label", startStopBtn.title);
   }
 
   function normalizeLanguage(raw) {
@@ -687,8 +707,6 @@
     if (labelInsecureToggleNode) labelInsecureToggleNode.textContent = tr("allowInsecure");
     if (labelProfileNode) labelProfileNode.textContent = tr("profile");
     if (labelSelectorNode) labelSelectorNode.textContent = tr("selector");
-    if (labelRunCheckNode) labelRunCheckNode.textContent = tr("runCheck");
-    if (labelUptimeNode) labelUptimeNode.textContent = tr("uptimeLabel");
     if (labelCheckConfigNode) labelCheckConfigNode.textContent = tr("checkConfigLabel");
     if (checkConfigBtn) checkConfigBtn.textContent = tr("checkConfig");
     if (refreshConfigBtn) refreshConfigBtn.textContent = tr("refreshConfig");
@@ -705,7 +723,7 @@
     if (mobileActionCheckConfigBtn) mobileActionCheckConfigBtn.textContent = tr("checkConfig");
     if (mobileActionRefreshConfigBtn) mobileActionRefreshConfigBtn.textContent = tr("refreshConfig");
     if (mobileActionCopyLogsBtn) mobileActionCopyLogsBtn.textContent = tr("copyLogs");
-    if (startStopBtn) startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
+    renderStartStopText();
     renderStartStopIndicator();
     if (releaseCurrentCaptionNode) releaseCurrentCaptionNode.textContent = tr("releaseCurrent");
     if (releaseLatestCaptionNode) releaseLatestCaptionNode.textContent = tr("releaseLatest");
@@ -870,9 +888,7 @@
   }
 
   function renderUptime(uptimeSeconds, running) {
-    if (!uptimeNode) return;
-    var shown = running ? formatUptime(uptimeSeconds) : "00:00:00";
-    uptimeNode.textContent = shown;
+    renderStartStopText();
   }
 
   function setLanguage(next, persist) {
@@ -1159,11 +1175,29 @@
         current = options[0];
       }
 
+      var optionDelays = {};
+      var rawDelays = raw.option_delays || {};
+      for (var delayName in rawDelays) {
+        if (!Object.prototype.hasOwnProperty.call(rawDelays, delayName)) continue;
+        var cleanDelayName = String(delayName || "").trim();
+        if (!cleanDelayName) continue;
+        var rawDelay = rawDelays[delayName] || {};
+        var delayValue = parseInt(rawDelay.delay, 10);
+        if (isNaN(delayValue)) delayValue = 0;
+        optionDelays[cleanDelayName] = {
+          delay: delayValue,
+          error: String(rawDelay.error || "").trim(),
+          checkedAt: parseInt(rawDelay.checked_at || 0, 10) || 0
+        };
+      }
+
       normalized.push({
         name: name,
+        type: String(raw.type || raw.group_type || "").trim(),
         current: current,
         options: options,
-        canSwitch: !!raw.can_switch
+        canSwitch: !!raw.can_switch,
+        optionDelays: optionDelays
       });
     }
     return normalized;
@@ -1188,6 +1222,36 @@
       }
     }
     return null;
+  }
+
+  function selectorOptionKey(selectorName, outboundName) {
+    return String(selectorName || "").trim().toLowerCase() + "\u0000" + String(outboundName || "").trim().toLowerCase();
+  }
+
+  function selectorOptionDelay(group, outboundName) {
+    if (!group || !group.optionDelays) return null;
+    var needle = String(outboundName || "").trim().toLowerCase();
+    for (var key in group.optionDelays) {
+      if (!Object.prototype.hasOwnProperty.call(group.optionDelays, key)) continue;
+      if (String(key || "").trim().toLowerCase() === needle) {
+        return group.optionDelays[key];
+      }
+    }
+    return null;
+  }
+
+  function formatSelectorDelay(delayState) {
+    if (!delayState) return tr("selectorDelayUntested");
+    if (delayState.error || delayState.delay < 0) return tr("selectorDelayError");
+    if (delayState.delay > 0) return String(delayState.delay) + "ms";
+    return tr("selectorDelayUntested");
+  }
+
+  function selectorDelayTitle(delayState) {
+    if (!delayState) return "";
+    if (delayState.error) return delayState.error;
+    if (delayState.delay > 0) return String(delayState.delay) + "ms";
+    return "";
   }
 
   function closeSelectorMenu() {
@@ -1307,30 +1371,122 @@
     return null;
   }
 
+  function selectorGroupKey(name) {
+    return String(name || "").trim().toLowerCase();
+  }
+
+  function normalizeSelectorCollapsedGroups(raw) {
+    var clean = {};
+    if (!raw || typeof raw !== "object") return clean;
+    for (var key in raw) {
+      if (!Object.prototype.hasOwnProperty.call(raw, key)) continue;
+      var cleanKey = selectorGroupKey(key);
+      if (cleanKey && raw[key] === true) {
+        clean[cleanKey] = true;
+      }
+    }
+    return clean;
+  }
+
+  function saveSelectorCollapsedGroups() {
+    api("POST", "/api/state", {
+      selector_collapsed_groups: selectorCollapsedGroups || {}
+    }, function (err, state) {
+      if (err) {
+        setStatus(tr("errorPrefix") + err.message);
+        return;
+      }
+      renderState(state);
+    });
+  }
+
+  function isSelectorGroupCollapsed(groupName) {
+    var key = selectorGroupKey(groupName);
+    if (!key) return false;
+    return selectorCollapsedGroups[key] === true;
+  }
+
+  function toggleSelectorGroupCollapsed(groupName) {
+    var key = selectorGroupKey(groupName);
+    if (!key) return;
+    if (isSelectorGroupCollapsed(groupName)) {
+      delete selectorCollapsedGroups[key];
+    } else {
+      selectorCollapsedGroups[key] = true;
+    }
+    saveSelectorCollapsedGroups();
+    selectorGroupsRenderKey = "";
+    renderSelectorGroups(selectorGroups);
+  }
+
+  function selectorGroupTypeLabel(group) {
+    var groupType = String(group && group.type || "").trim();
+    if (groupType) return groupType;
+    if (group && group.canSwitch) return "Selector";
+    return "";
+  }
+
+  function isSelectorURLTestGroup(group) {
+    var groupType = String(group && (group.type || group.groupType) || "").trim().toLowerCase();
+    return groupType === "urltest" || groupType === "url-test" || groupType === "url_test" || groupType === "url test";
+  }
+
+  function selectorSpeedIconHTML() {
+    return '<svg class="selector-speed-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M12 4a9 9 0 0 1 9 9 8.9 8.9 0 0 1-1.4 4.8 1 1 0 0 1-.84.45H5.24a1 1 0 0 1-.84-.45A8.9 8.9 0 0 1 3 13a9 9 0 0 1 9-9Zm0 2a7 7 0 0 0-7 7c0 1.13.27 2.22.78 3.2h12.44A6.9 6.9 0 0 0 19 13a7 7 0 0 0-7-7Zm4.95 3.64a1 1 0 0 1 .09 1.41l-3.5 4a2 2 0 1 1-1.5-1.32l3.5-4a1 1 0 0 1 1.41-.09Z" fill="currentColor"></path></svg>';
+  }
+
+  function updateSelectorPingAllButton() {
+    var isPinging = !!selectorPingInFlightKey;
+    var title = lastRunning ? tr("selectorPingTitle") : tr("selectorDelayNeedRun");
+    var disabled = selectorSwitchInFlight || isPinging || lastBusy || !lastRunning || !selectorGroups.length;
+
+    if (selectorPingAllBtn) {
+      selectorPingAllBtn.disabled = !!disabled;
+      selectorPingAllBtn.className = "control selector-global-ping-btn" + (isPinging ? " loading" : "");
+      selectorPingAllBtn.title = title;
+      selectorPingAllBtn.setAttribute("aria-label", title || tr("selectorPingTitle"));
+      selectorPingAllBtn.innerHTML = isPinging ? '<span class="selector-ping-busy">' + tr("selectorPingBusy") + '</span>' : selectorSpeedIconHTML();
+    }
+
+    if (!selectorGroupsNode) return;
+    var groupButtons = selectorGroupsNode.getElementsByClassName("selector-group-ping");
+    for (var i = 0; i < groupButtons.length; i++) {
+      var btn = groupButtons[i];
+      var selectorName = String(btn.getAttribute("data-selector") || "").trim();
+      var pingKey = selectorGroupKey(selectorName);
+      var isThisPinging = selectorPingInFlightKey === pingKey || selectorPingInFlightKey === "__all__";
+      var groupDisabled = selectorSwitchInFlight || isPinging || lastBusy || !lastRunning || !pingKey;
+      btn.disabled = !!groupDisabled;
+      btn.className = "control selector-group-ping" + (isThisPinging ? " loading" : "");
+      btn.title = title;
+      btn.setAttribute("aria-label", title || tr("selectorPingTitle"));
+      btn.innerHTML = isThisPinging ? '<span class="selector-ping-busy">' + tr("selectorPingBusy") + '</span>' : selectorSpeedIconHTML();
+    }
+  }
+
   function applySelectorControlsDisabledState() {
     if (!selectorGroupsNode) return;
-    var toggles = selectorGroupsNode.getElementsByClassName("selector-picker");
-    if (!toggles || !toggles.length) return;
-    for (var i = 0; i < toggles.length; i++) {
-      var toggleNode = toggles[i];
-      var selectorName = toggleNode.getAttribute("data-selector") || "";
-      var group = findSelectorGroupByName(selectorName);
-      var disabled = selectorSwitchInFlight || lastBusy || !group || !group.canSwitch;
-      toggleNode.disabled = !!disabled;
-    }
 
     var options = selectorGroupsNode.getElementsByClassName("selector-option");
     for (var j = 0; j < options.length; j++) {
       var optionNode = options[j];
       var optionSelectorName = optionNode.getAttribute("data-selector") || "";
       var optionGroup = findSelectorGroupByName(optionSelectorName);
-      var optionDisabled = selectorSwitchInFlight || lastBusy || !optionGroup || !optionGroup.canSwitch;
+      var canSwitch = !!(optionGroup && optionGroup.canSwitch && !isSelectorURLTestGroup(optionGroup));
+      var isActive = optionNode.getAttribute("aria-selected") === "true";
+      var optionDisabled = selectorSwitchInFlight || !!selectorPingInFlightKey || lastBusy;
       optionNode.disabled = !!optionDisabled;
+      optionNode.setAttribute("aria-disabled", canSwitch ? "false" : "true");
+      optionNode.tabIndex = canSwitch ? 0 : -1;
+      optionNode.className = "control selector-option selector-option-card" + (isActive ? " active" : "") + (!canSwitch ? " locked" : "") + (optionDisabled ? " disabled" : "");
     }
 
-    if (selectorSwitchInFlight || lastBusy) {
-      closeSelectorMenu();
+    var toggles = selectorGroupsNode.getElementsByClassName("selector-group-toggle");
+    for (var i = 0; i < toggles.length; i++) {
+      toggles[i].disabled = false;
     }
+
+    updateSelectorPingAllButton();
   }
 
   function renderSelectorGroups(nextGroups) {
@@ -1338,6 +1494,8 @@
 
     if (!selectorBlockNode || !selectorGroupsNode) return;
     selectorBlockNode.hidden = false;
+    updateSelectorPingAllButton();
+
     if (!selectorGroups.length) {
       closeSelectorMenu();
 
@@ -1350,141 +1508,130 @@
       var emptyItem = document.createElement("div");
       emptyItem.className = "selector-item selector-item-empty";
 
-      var emptyWrap = document.createElement("div");
-      emptyWrap.className = "profile-picker-wrap selector-picker-wrap selector-picker-wrap-empty";
-
-      var emptyGroup = document.createElement("div");
-      emptyGroup.className = "profile-name-group selector-name-group";
-
-      var emptyInput = document.createElement("input");
-      emptyInput.className = "control profile-name-input selector-current-input selector-current-input-empty";
-      emptyInput.type = "text";
-      emptyInput.readOnly = true;
-      emptyInput.tabIndex = -1;
-      emptyInput.value = emptyText;
-      emptyInput.title = emptyText;
-      emptyInput.setAttribute("aria-hidden", "true");
-      emptyGroup.appendChild(emptyInput);
-
-      var emptyPicker = document.createElement("button");
-      emptyPicker.type = "button";
-      emptyPicker.className = "control profile-picker selector-picker selector-picker-empty";
-      emptyPicker.disabled = true;
-      emptyPicker.tabIndex = -1;
-      emptyPicker.setAttribute("aria-hidden", "true");
-
-      var emptyArrowNode = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      emptyArrowNode.setAttribute("class", "profile-arrow");
-      emptyArrowNode.setAttribute("stroke", "currentColor");
-      emptyArrowNode.setAttribute("fill", "none");
-      emptyArrowNode.setAttribute("stroke-width", "2");
-      emptyArrowNode.setAttribute("viewBox", "0 0 24 24");
-      emptyArrowNode.setAttribute("stroke-linecap", "round");
-      emptyArrowNode.setAttribute("stroke-linejoin", "round");
-      emptyArrowNode.setAttribute("height", "20");
-      emptyArrowNode.setAttribute("width", "20");
-      emptyArrowNode.setAttribute("aria-hidden", "true");
-      emptyArrowNode.setAttribute("focusable", "false");
-      var emptyArrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      emptyArrowPath.setAttribute("d", "M6 9l6 6l6 -6");
-      emptyArrowNode.appendChild(emptyArrowPath);
-      emptyPicker.appendChild(emptyArrowNode);
-
-      emptyGroup.appendChild(emptyPicker);
-      emptyWrap.appendChild(emptyGroup);
-      emptyItem.appendChild(emptyWrap);
+      var emptyTextNode = document.createElement("div");
+      emptyTextNode.className = "control selector-empty-box";
+      emptyTextNode.textContent = emptyText;
+      emptyTextNode.title = emptyText;
+      emptyItem.appendChild(emptyTextNode);
 
       selectorGroupsNode.innerHTML = "";
       selectorGroupsNode.appendChild(emptyItem);
       selectorGroupsRenderKey = emptyKey;
+      applySelectorControlsDisabledState();
       return;
     }
 
-    var nextKey = buildSelectorGroupsRenderKey(selectorGroups);
+    var nextKey = buildSelectorGroupsRenderKey(selectorGroups) + ":collapsed:" + JSON.stringify(selectorCollapsedGroups || {});
     if (nextKey === selectorGroupsRenderKey) {
       applySelectorControlsDisabledState();
       return;
     }
 
-    var showGroupName = selectorGroups.length > 1;
     var frag = document.createDocumentFragment();
     for (var i = 0; i < selectorGroups.length; i++) {
       var group = selectorGroups[i];
-      var item = document.createElement("div");
-      item.className = "selector-item";
+      var groupName = String(group.name || "").trim();
+      if (!groupName) continue;
+      var collapsed = isSelectorGroupCollapsed(groupName);
+      var groupType = selectorGroupTypeLabel(group);
+      var isURLTest = isSelectorURLTestGroup(group);
 
-      if (showGroupName) {
-        var label = document.createElement("div");
-        label.className = "selector-item-label";
-        label.textContent = group.name;
-        item.appendChild(label);
+      var item = document.createElement("div");
+      item.className = "selector-group-card" + (isURLTest ? " urltest" : "") + (collapsed ? " collapsed" : "");
+      item.setAttribute("data-selector", groupName);
+
+      var header = document.createElement("div");
+      header.className = "selector-group-header";
+
+      var titleBtn = document.createElement("button");
+      titleBtn.type = "button";
+      titleBtn.className = "selector-group-title-btn";
+      titleBtn.setAttribute("data-selector", groupName);
+      titleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+
+      var titleWrap = document.createElement("span");
+      titleWrap.className = "selector-group-title-wrap";
+
+      var title = document.createElement("span");
+      title.className = "selector-group-title";
+      title.textContent = groupName;
+      title.title = groupName;
+      titleWrap.appendChild(title);
+
+      if (groupType) {
+        var type = document.createElement("span");
+        type.className = "selector-group-type";
+        type.textContent = groupType;
+        titleWrap.appendChild(type);
+      }
+      titleBtn.appendChild(titleWrap);
+      header.appendChild(titleBtn);
+
+      var actions = document.createElement("div");
+      actions.className = "selector-group-actions";
+
+      if (!isURLTest) {
+        var pingButton = document.createElement("button");
+        pingButton.type = "button";
+        pingButton.className = "control selector-group-ping";
+        pingButton.setAttribute("data-selector", groupName);
+        pingButton.setAttribute("aria-label", tr("selectorPingTitle"));
+        pingButton.title = tr("selectorPingTitle");
+        pingButton.innerHTML = selectorSpeedIconHTML();
+        actions.appendChild(pingButton);
       }
 
-      var wrap = document.createElement("div");
-      wrap.className = "profile-picker-wrap selector-picker-wrap";
-      wrap.setAttribute("data-selector", group.name);
+      var toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "selector-group-toggle";
+      toggle.setAttribute("data-selector", groupName);
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      toggle.setAttribute("aria-label", collapsed ? "Expand" : "Collapse");
+      toggle.innerHTML = '<svg class="selector-group-arrow" stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M6 15l6 -6l6 6"></path></svg>';
+      actions.appendChild(toggle);
+      header.appendChild(actions);
+      item.appendChild(header);
 
-      var nameGroup = document.createElement("div");
-      nameGroup.className = "profile-name-group selector-name-group";
+      var optionsList = document.createElement("div");
+      optionsList.className = "selector-options-grid";
+      optionsList.setAttribute("data-selector", groupName);
+      if (collapsed) {
+        optionsList.hidden = true;
+      }
 
-      var currentInput = document.createElement("input");
-      currentInput.className = "control profile-name-input selector-current-input";
-      currentInput.type = "text";
-      currentInput.readOnly = true;
-      currentInput.tabIndex = -1;
-      currentInput.value = group.current;
-      currentInput.title = group.current;
-      currentInput.setAttribute("aria-hidden", "true");
-      nameGroup.appendChild(currentInput);
-
-      var picker = document.createElement("button");
-      picker.type = "button";
-      picker.className = "control profile-picker selector-picker";
-      picker.setAttribute("data-selector", group.name);
-      picker.setAttribute("aria-haspopup", "listbox");
-      picker.setAttribute("aria-expanded", "false");
-      picker.title = group.current;
-
-      var arrowNode = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      arrowNode.setAttribute("class", "profile-arrow");
-      arrowNode.setAttribute("stroke", "currentColor");
-      arrowNode.setAttribute("fill", "none");
-      arrowNode.setAttribute("stroke-width", "2");
-      arrowNode.setAttribute("viewBox", "0 0 24 24");
-      arrowNode.setAttribute("stroke-linecap", "round");
-      arrowNode.setAttribute("stroke-linejoin", "round");
-      arrowNode.setAttribute("height", "20");
-      arrowNode.setAttribute("width", "20");
-      arrowNode.setAttribute("aria-hidden", "true");
-      arrowNode.setAttribute("focusable", "false");
-      var arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      arrowPath.setAttribute("d", "M6 9l6 6l6 -6");
-      arrowNode.appendChild(arrowPath);
-      picker.appendChild(arrowNode);
-
-      nameGroup.appendChild(picker);
-      wrap.appendChild(nameGroup);
-
-      var menu = document.createElement("div");
-      menu.className = "profile-menu selector-menu";
-      menu.setAttribute("role", "listbox");
-      menu.hidden = true;
       for (var j = 0; j < group.options.length; j++) {
         var optionValue = group.options[j];
+        var isActive = optionValue === group.current;
+        var delayState = selectorOptionDelay(group, optionValue);
+        var canSwitch = !!group.canSwitch && !isURLTest;
+
         var optionNode = document.createElement("button");
         optionNode.type = "button";
-        optionNode.className = "profile-option selector-option" + (optionValue === group.current ? " active" : "");
+        optionNode.className = "control selector-option selector-option-card" + (isActive ? " active" : "") + (!canSwitch ? " locked" : "");
         optionNode.setAttribute("role", "option");
-        optionNode.setAttribute("aria-selected", optionValue === group.current ? "true" : "false");
-        optionNode.setAttribute("data-selector", group.name);
+        optionNode.setAttribute("aria-selected", isActive ? "true" : "false");
+        optionNode.setAttribute("aria-disabled", canSwitch ? "false" : "true");
+        optionNode.setAttribute("data-selector", groupName);
         optionNode.setAttribute("data-outbound", optionValue);
         optionNode.value = optionValue;
-        optionNode.textContent = optionValue;
-        menu.appendChild(optionNode);
-      }
-      wrap.appendChild(menu);
-      item.appendChild(wrap);
+        optionNode.title = optionValue;
+        optionNode.tabIndex = canSwitch ? 0 : -1;
 
+        var optionNameNode = document.createElement("span");
+        optionNameNode.className = "selector-option-name";
+        optionNameNode.textContent = optionValue;
+        optionNode.appendChild(optionNameNode);
+
+        var delayBadge = document.createElement("span");
+        delayBadge.className = "selector-option-delay" + (delayState && delayState.error ? " error" : (delayState && delayState.delay > 0 ? " measured" : ""));
+        delayBadge.textContent = formatSelectorDelay(delayState);
+        delayBadge.title = selectorDelayTitle(delayState);
+        optionNode.appendChild(delayBadge);
+
+        optionsList.appendChild(optionNode);
+      }
+
+      item.appendChild(optionsList);
       frag.appendChild(item);
     }
 
@@ -1496,10 +1643,13 @@
   }
 
   function runSelectorSwitch(selectorName, outboundName, selectNode) {
-    if (selectorSwitchInFlight || lastBusy) return;
+    if (selectorSwitchInFlight || selectorPingInFlightKey || lastBusy) return;
     var selector = String(selectorName || "").trim();
     var outbound = String(outboundName || "").trim();
     if (!selector || !outbound) return;
+
+    var group = findSelectorGroupByName(selector);
+    if (!group || !group.canSwitch || isSelectorURLTestGroup(group)) return;
 
     selectorSwitchInFlight = true;
     applySelectorControlsDisabledState();
@@ -1513,6 +1663,37 @@
         pollLogs(true);
         if (selectNode && selectNode.focus) {
           try { selectNode.focus(); } catch (e) {}
+        }
+        setStatus(tr("errorPrefix") + err.message);
+        showToast("error", tr("errorPrefix") + err.message);
+        refreshState(true);
+        return;
+      }
+      renderState(state);
+      applySelectorControlsDisabledState();
+      pollLogs(true);
+    });
+  }
+
+  function runSelectorPingAll(selectorName, buttonNode) {
+    if (selectorSwitchInFlight || selectorPingInFlightKey || lastBusy) return;
+    if (!selectorGroups.length) return;
+    if (!lastRunning) {
+      showToast("error", tr("selectorDelayNeedRun"));
+      setStatus(tr("errorPrefix") + tr("selectorDelayNeedRun"));
+      return;
+    }
+
+    var selector = String(selectorName || "").trim();
+    selectorPingInFlightKey = selector ? selectorGroupKey(selector) : "__all__";
+    applySelectorControlsDisabledState();
+
+    api("POST", "/api/selector/delay-all", { selector: selector }, function (err, state) {
+      selectorPingInFlightKey = "";
+      if (err) {
+        pollLogs(true);
+        if (buttonNode && buttonNode.focus) {
+          try { buttonNode.focus(); } catch (e) {}
         }
         setStatus(tr("errorPrefix") + err.message);
         showToast("error", tr("errorPrefix") + err.message);
@@ -1727,6 +1908,7 @@
       nextSelected = profileNames[0];
     }
     setSelectedProfile(nextSelected);
+    selectorCollapsedGroups = normalizeSelectorCollapsedGroups(state.selector_collapsed_groups || {});
 
     var profilesChanged = !sameStringArray(prevProfileNames, profileNames);
     var selectedChanged = prevSelectedProfile !== nextSelected;
@@ -1786,9 +1968,7 @@
     if (languageChanged || needsInitialLanguageApply) {
       applyLanguageUI();
     } else {
-      if (startStopBtn) {
-        startStopBtn.textContent = lastRunning ? tr("stop") : tr("start");
-      }
+      renderStartStopText();
       renderStartStopIndicator();
       renderUptime(lastUptimeSeconds, lastRunning);
       if (selectorGroupsChanged || prevBusy !== lastBusy || prevRunning !== lastRunning) {
@@ -1807,7 +1987,7 @@
       lastAllowInsecure = !!state.allow_insecure;
       allowInsecureInput.checked = lastAllowInsecure;
     }
-    
+
     lastProtoWarn = state.proto_reg_warn || "";
     renderDefaultStatus(lastProtoWarn);
 
@@ -2572,6 +2752,28 @@
       var target = event && (event.target || event.srcElement);
       if (!target) return;
 
+      var groupPingNode = findAncestorByClass(target, "selector-group-ping", selectorGroupsNode);
+      if (groupPingNode) {
+        if (groupPingNode.disabled) return;
+        var groupPingSelector = String(groupPingNode.getAttribute("data-selector") || "").trim();
+        runSelectorPingAll(groupPingSelector, groupPingNode);
+        return;
+      }
+
+      var groupToggleNode = findAncestorByClass(target, "selector-group-toggle", selectorGroupsNode);
+      if (groupToggleNode) {
+        var toggleSelector = String(groupToggleNode.getAttribute("data-selector") || "").trim();
+        toggleSelectorGroupCollapsed(toggleSelector);
+        return;
+      }
+
+      var titleNode = findAncestorByClass(target, "selector-group-title-btn", selectorGroupsNode);
+      if (titleNode) {
+        var titleSelector = String(titleNode.getAttribute("data-selector") || "").trim();
+        toggleSelectorGroupCollapsed(titleSelector);
+        return;
+      }
+
       var optionNode = findAncestorByClass(target, "selector-option", selectorGroupsNode);
       if (optionNode) {
         var optionSelector = String(optionNode.getAttribute("data-selector") || "").trim();
@@ -2580,20 +2782,13 @@
         runSelectorSwitch(optionSelector, optionOutbound, optionNode);
         return;
       }
-
-      var pickerNode = findAncestorByClass(target, "selector-picker", selectorGroupsNode);
-      if (pickerNode) {
-        var pickerSelector = String(pickerNode.getAttribute("data-selector") || "").trim();
-        if (!pickerSelector || pickerNode.disabled) return;
-        var normalizedPickerSelector = pickerSelector.toLowerCase();
-        var normalizedOpenedSelector = String(selectorMenuOpenName || "").trim().toLowerCase();
-        if (normalizedOpenedSelector && normalizedOpenedSelector === normalizedPickerSelector) {
-          closeSelectorMenu();
-          return;
-        }
-        openSelectorMenu(pickerSelector);
-      }
     });
+  }
+
+  if (selectorPingAllBtn) {
+    selectorPingAllBtn.onclick = function () {
+      runSelectorPingAll("", selectorPingAllBtn);
+    };
   }
 
   langRuBtn.onclick = function () {

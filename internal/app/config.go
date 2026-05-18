@@ -70,10 +70,11 @@ func (c AppConfig) MarshalYAML() (interface{}, error) {
 }
 
 type ConfigProfile struct {
-	Name               string            `yaml:"name" json:"name"`
-	URL                string            `yaml:"url" json:"url"`
-	Version            string            `yaml:"version" json:"version"`
-	SelectorSelections map[string]string `yaml:"selector_selections,omitempty" json:"selector_selections,omitempty"`
+	Name                    string            `yaml:"name" json:"name"`
+	URL                     string            `yaml:"url" json:"url"`
+	Version                 string            `yaml:"version" json:"version"`
+	SelectorSelections      map[string]string `yaml:"selector_selections,omitempty" json:"selector_selections,omitempty"`
+	SelectorCollapsedGroups map[string]bool   `yaml:"selector_collapsed_groups,omitempty" json:"selector_collapsed_groups,omitempty"`
 }
 
 func loadOrCreateConfig(path string) (AppConfig, error) {
@@ -190,10 +191,11 @@ func normalizeConfigProfiles(cfg *AppConfig) {
 		}
 
 		normalized = append(normalized, ConfigProfile{
-			Name:               name,
-			URL:                strings.TrimSpace(p.URL),
-			Version:            version,
-			SelectorSelections: normalizeSelectorSelections(p.SelectorSelections),
+			Name:                    name,
+			URL:                     strings.TrimSpace(p.URL),
+			Version:                 version,
+			SelectorSelections:      normalizeSelectorSelections(p.SelectorSelections),
+			SelectorCollapsedGroups: normalizeSelectorCollapsedGroups(p.SelectorCollapsedGroups),
 		})
 	}
 	cfg.Profiles = normalized
@@ -244,6 +246,40 @@ func cloneSelectorSelections(raw map[string]string) map[string]string {
 	return cloned
 }
 
+func normalizeSelectorCollapsedGroups(raw map[string]bool) map[string]bool {
+	if len(raw) == 0 {
+		return nil
+	}
+	normalized := make(map[string]bool, len(raw))
+	for rawKey, collapsed := range raw {
+		key := strings.TrimSpace(rawKey)
+		if key == "" || !collapsed {
+			continue
+		}
+		normalized[key] = true
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
+}
+
+func cloneSelectorCollapsedGroups(raw map[string]bool) map[string]bool {
+	if len(raw) == 0 {
+		return nil
+	}
+	cloned := make(map[string]bool, len(raw))
+	for k, v := range raw {
+		if strings.TrimSpace(k) != "" && v {
+			cloned[k] = true
+		}
+	}
+	if len(cloned) == 0 {
+		return nil
+	}
+	return cloned
+}
+
 func cloneConfigProfiles(profiles []ConfigProfile) []ConfigProfile {
 	if len(profiles) == 0 {
 		return nil
@@ -251,10 +287,11 @@ func cloneConfigProfiles(profiles []ConfigProfile) []ConfigProfile {
 	cloned := make([]ConfigProfile, 0, len(profiles))
 	for _, profile := range profiles {
 		cloned = append(cloned, ConfigProfile{
-			Name:               profile.Name,
-			URL:                profile.URL,
-			Version:            profile.Version,
-			SelectorSelections: cloneSelectorSelections(profile.SelectorSelections),
+			Name:                    profile.Name,
+			URL:                     profile.URL,
+			Version:                 profile.Version,
+			SelectorSelections:      cloneSelectorSelections(profile.SelectorSelections),
+			SelectorCollapsedGroups: cloneSelectorCollapsedGroups(profile.SelectorCollapsedGroups),
 		})
 	}
 	return cloned

@@ -37,8 +37,8 @@ const (
 	uiReadyFallbackTimeout = 5 * time.Second
 	gclpHICON              = int32(-14)
 	gclpHICONSM            = int32(-34)
-	mainWindowMinWidth     = 920
-	mainWindowMinHeight    = 600
+	mainWindowMinWidth     = 940
+	mainWindowMinHeight    = 620
 	mainWindowMaxWidth     = 1480
 	mainWindowMaxHeight    = 980
 	embeddedSyncDebounce   = 60 * time.Millisecond
